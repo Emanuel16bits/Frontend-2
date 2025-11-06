@@ -35,6 +35,17 @@ const routes = [
       component: () => import('../components/RegisterRestaurant.vue'),
       meta: { role: 'vendedor' }
    },
+   {
+    path: '/mis-productos',
+    component: () => import('../views/vendor/products.vue'),
+    meta: { role: 'vendedor' }
+  },
+  // Agregar esta ruta al array de rutas
+  {
+    path: '/restaurante/:id',
+    component: () => import('../components/RestaurantDetail.vue'),
+    meta: { role: 'cliente' }
+  },
   {
       path: '/carrito',
       component: () => import('../views/client/Cart.vue'),

@@ -11,7 +11,7 @@
 
     <div class="container">
       <!-- Empty Cart -->
-      <div v-if="!tieneItems" class="empty-cart">
+      <div v-if="!cartStore.items.length" class="empty-cart">
         <div class="empty-icon">🛒</div>
         <h2>Tu carrito está vacío</h2>
         <p>Agrega productos de tus restaurantes favoritos</p>
@@ -24,9 +24,9 @@
       <div v-else class="cart-content">
         <div class="cart-main">
           <!-- Restaurant Info -->
-          <div class="restaurant-card" v-if="restauranteActual">
+          <div class="restaurant-card" v-if="cartStore.restaurantName">
             <div class="restaurant-header">
-              <h3>{{ restauranteActual.nombre }}</h3>
+              <h3>{{ cartStore.restaurantName }}</h3>
               <button @click="handleClearCart" class="btn-clear-cart">
                 🗑️ Vaciar carrito
               </button>
@@ -35,40 +35,39 @@
 
           <!-- Cart Items -->
           <div class="cart-items">
-            <h3>Productos ({{ totalItems }})</h3>
+            <h3>Productos ({{ cartStore.totalItems }})</h3>
             
             <div
-              v-for="item in cartItems"
+              v-for="item in cartStore.items"
               :key="item.id"
               class="cart-item"
             >
               <img
-                :src="item.imagen || 'https://via.placeholder.com/100'"
-                :alt="item.nombre"
+                :src="getImageUrl(item.imagen)"
+                :alt="item.name"
                 class="item-image"
+                @error="handleImageError"
               />
               
               <div class="item-info">
-                <h4>{{ item.nombre }}</h4>
-                <p class="item-description">{{ item.descripcion }}</p>
-                <div class="item-notes" v-if="item.notas">
-                  <span>📝 {{ item.notas }}</span>
-                </div>
+                <h4>{{ item.name }}</h4>
+                <p class="item-description">{{ item.descripcion || 'Sin descripción' }}</p>
               </div>
 
               <div class="item-actions">
-                <div class="item-price">${{ item.precio }}</div>
+                <div class="item-price">${{ item.price.toFixed(2) }}</div>
                 
                 <div class="quantity-controls">
                   <button
-                    @click="decrementarCantidad(item.id)"
+                    @click="updateQuantity(item.id, item.quantity - 1)"
                     class="qty-btn"
+                    :disabled="item.quantity <= 1"
                   >
                     −
                   </button>
-                  <span class="quantity">{{ item.cantidad }}</span>
+                  <span class="quantity">{{ item.quantity }}</span>
                   <button
-                    @click="incrementarCantidad(item.id)"
+                    @click="updateQuantity(item.id, item.quantity + 1)"
                     class="qty-btn"
                   >
                     +
@@ -76,11 +75,11 @@
                 </div>
 
                 <div class="item-total">
-                  ${{ item.precio * item.cantidad }}
+                  ${{ (item.price * item.quantity).toFixed(2) }}
                 </div>
 
                 <button
-                  @click="eliminarItem(item.id)"
+                  @click="removeItem(item.id)"
                   class="btn-remove"
                   title="Eliminar"
                 >
@@ -93,108 +92,45 @@
           <!-- Add Notes Section -->
           <div class="add-notes-section">
             <h3>📝 Notas para el restaurante</h3>
-            <textarea
-              v-model="notasPedido"
-              placeholder="Ejemplo: Sin cebolla, extra queso, etc."
-              class="notes-textarea"
-              maxlength="200"
-            ></textarea>
-            <small>{{ notasPedido.length }}/200 caracteres</small>
+            <div class="notes-container">
+              <textarea
+                v-model="notasPedido"
+                placeholder="Ejemplo: Sin cebolla, extra queso, etc."
+                class="notes-textarea"
+                maxlength="200"
+              ></textarea>
+              <div class="char-count">{{ notasPedido.length }}/200</div>
+            </div>
           </div>
         </div>
 
-        <!-- Order Summary Sidebar -->
+        <!-- Order Summary -->
         <div class="order-summary">
           <div class="summary-card">
             <h3>Resumen del pedido</h3>
 
-            <!-- Delivery Address -->
-            <div class="delivery-section">
-              <h4>📍 Dirección de entrega</h4>
-              <div class="address-box" @click="showAddressModal = true">
-                <p v-if="direccionEntrega">{{ direccionEntrega }}</p>
-                <p v-else class="add-address">+ Agregar dirección</p>
-              </div>
+            <div class="summary-row">
+              <span>Subtotal</span>
+              <span>${{ cartStore.totalPrice.toFixed(2) }}</span>
+            </div>
+            <div class="summary-row">
+              <span>Envío</span>
+              <span>$0.00</span>
+            </div>
+            <div class="divider"></div>
+            <div class="summary-row total">
+              <span>Total</span>
+              <span>${{ cartStore.totalPrice.toFixed(2) }}</span>
             </div>
 
-            <!-- Payment Method -->
-            <div class="payment-section">
-              <h4>💳 Método de pago</h4>
-              <select v-model="metodoPago" class="payment-select">
-                <option value="">Seleccionar método</option>
-                <option value="efectivo">💵 Efectivo</option>
-                <option value="tarjeta">💳 Tarjeta de crédito/débito</option>
-                <option value="mercadopago">🔵 Mercado Pago</option>
-              </select>
-            </div>
-
-            <!-- Summary Details -->
-            <div class="summary-details">
-              <div class="summary-row">
-                <span>Subtotal</span>
-                <span>${{ subtotal }}</span>
-              </div>
-              <div class="summary-row">
-                <span>Costo de envío</span>
-                <span>${{ costoEnvio }}</span>
-              </div>
-              <div class="summary-row" v-if="descuento > 0">
-                <span class="discount">Descuento</span>
-                <span class="discount">-${{ descuento }}</span>
-              </div>
-              <div class="summary-row total">
-                <span>Total</span>
-                <span>${{ total }}</span>
-              </div>
-            </div>
-
-            <!-- Promo Code -->
-            <div class="promo-section">
-              <input
-                v-model="codigoPromo"
-                type="text"
-                placeholder="Código de descuento"
-                class="promo-input"
-              />
-              <button @click="aplicarPromo" class="btn-apply-promo">
-                Aplicar
-              </button>
-            </div>
-
-            <!-- Checkout Button -->
             <button
               @click="confirmarPedido"
-              :disabled="!puedeConfirmar"
               class="btn-checkout"
+              :disabled="!cartStore.items.length"
             >
               Confirmar Pedido
             </button>
-
-            <p class="terms-text">
-              Al confirmar aceptas los términos y condiciones
-            </p>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Address Modal -->
-    <div v-if="showAddressModal" class="modal-overlay" @click="showAddressModal = false">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>📍 Dirección de entrega</h3>
-          <button @click="showAddressModal = false" class="btn-close-modal">✕</button>
-        </div>
-        <div class="modal-body">
-          <textarea
-            v-model="direccionEntrega"
-            placeholder="Ingresa tu dirección completa"
-            class="address-textarea"
-          ></textarea>
-        </div>
-        <div class="modal-footer">
-          <button @click="showAddressModal = false" class="btn-cancel">Cancelar</button>
-          <button @click="guardarDireccion" class="btn-save">Guardar</button>
         </div>
       </div>
     </div>
@@ -204,220 +140,135 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useCartStore } from '@/stores/cartStore'
+import { useCartStore } from '@/services/cartStore'
 
 const router = useRouter()
 const cartStore = useCartStore()
-
 const notasPedido = ref('')
-const direccionEntrega = ref(cartStore.direccionEntrega || '')
-const metodoPago = ref(cartStore.metodoPago || '')
-const codigoPromo = ref('')
-const descuento = ref(0)
-const showAddressModal = ref(false)
+const imageLoadError = ref({})
 
-// Computed
-const cartItems = computed(() => cartStore.cartItems)
-const tieneItems = computed(() => cartStore.tieneItems)
-const totalItems = computed(() => cartStore.totalItems)
-const subtotal = computed(() => cartStore.subtotal)
-const costoEnvio = computed(() => cartStore.costoEnvio)
-const total = computed(() => cartStore.total - descuento.value)
-const restauranteActual = computed(() => cartStore.restauranteActual)
-
-const puedeConfirmar = computed(() => {
-  return tieneItems.value && direccionEntrega.value && metodoPago.value
-})
-
-// Methods
+// Métodos
 const goBack = () => {
-  router.back()
+  router.go(-1)
 }
 
 const goToRestaurants = () => {
   router.push('/buscar-restaurantes')
 }
 
-const incrementarCantidad = (productoId) => {
-  cartStore.actualizarCantidad(productoId, cartItems.value.find(i => i.id === productoId).cantidad + 1)
+const updateQuantity = (itemId, newQuantity) => {
+  if (newQuantity < 1) return
+  cartStore.updateQuantity(itemId, newQuantity)
 }
 
-const decrementarCantidad = (productoId) => {
-  const item = cartItems.value.find(i => i.id === productoId)
-  if (item.cantidad > 1) {
-    cartStore.actualizarCantidad(productoId, item.cantidad - 1)
-  } else {
-    eliminarItem(productoId)
-  }
-}
-
-const eliminarItem = (productoId) => {
-  if (confirm('¿Eliminar este producto del carrito?')) {
-    cartStore.eliminarItem(productoId)
-  }
+const removeItem = (itemId) => {
+  cartStore.removeItem(itemId)
 }
 
 const handleClearCart = () => {
-  if (confirm('¿Vaciar todo el carrito?')) {
-    cartStore.vaciarCarrito()
+  if (confirm('¿Estás seguro de vaciar el carrito?')) {
+    cartStore.clearCart()
   }
 }
 
-const guardarDireccion = () => {
-  cartStore.actualizarDireccion(direccionEntrega.value)
-  showAddressModal.value = false
+const handleImageError = (event) => {
+  event.target.src = 'https://via.placeholder.com/100'
 }
 
-const aplicarPromo = () => {
-  // Simulación de validación de código promocional
-  const codigosValidos = {
-    'RAPPI10': 100,
-    'PRIMERA': 200,
-    'DESCUENTO': 150
-  }
-
-  if (codigosValidos[codigoPromo.value.toUpperCase()]) {
-    descuento.value = codigosValidos[codigoPromo.value.toUpperCase()]
-    alert(`¡Código aplicado! Descuento de $${descuento.value}`)
-  } else {
-    alert('Código inválido')
-  }
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return 'https://via.placeholder.com/100'
+  if (imagePath.startsWith('http')) return imagePath
+  return `http://localhost:3000/${imagePath}`
 }
 
 const confirmarPedido = async () => {
-  if (!puedeConfirmar.value) {
-    alert('Por favor completa todos los datos')
-    return
-  }
-
   try {
     const pedido = {
-      items: cartItems.value,
-      subtotal: subtotal.value,
-      costoEnvio: costoEnvio.value,
-      descuento: descuento.value,
-      total: total.value,
-      direccionEntrega: direccionEntrega.value,
-      metodoPago: metodoPago.value,
+      items: cartStore.items,
       notas: notasPedido.value,
-      restauranteId: restauranteActual.value?.id
+      total: cartStore.totalPrice,
+      restauranteId: cartStore.restaurantId
     }
-
-    // Guardar método de pago para próximas compras
-    cartStore.actualizarMetodoPago(metodoPago.value)
-
-    // Aquí iría la llamada al backend para crear el pedido
-    console.log('Pedido a crear:', pedido)
-
-    // Simular creación de pedido
-    alert('¡Pedido confirmado! Te redirigiremos al seguimiento.')
     
-    // Limpiar carrito y redirigir
-    cartStore.vaciarCarrito()
+    console.log('Pedido a confirmar:', pedido)
+    cartStore.clearCart()
     router.push('/pedidos')
+    alert('¡Pedido realizado con éxito!')
   } catch (error) {
-    console.error('Error al confirmar pedido:', error)
-    alert('Error al confirmar el pedido. Intenta nuevamente.')
+    console.error('Error al confirmar el pedido:', error)
+    alert('Ocurrió un error al procesar tu pedido. Por favor, inténtalo de nuevo.')
   }
 }
 </script>
 
 <style scoped>
 .cart-page {
-  min-height: 100vh;
-  background-color: #f5f5f5;
-  padding-bottom: 40px;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: 70vh;
 }
 
+/* Header */
 .header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 20px 0;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  background: white;
+  padding: 15px 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
 }
 
 .header .container {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-}
-
-.header h1 {
-  margin: 0;
-  font-size: 28px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
 }
 
 .btn-back {
-  background-color: rgba(255, 255, 255, 0.2);
-  color: white;
+  background: #f5f5f5;
   border: none;
-  padding: 10px 20px;
+  padding: 8px 15px;
   border-radius: 20px;
   cursor: pointer;
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
 }
 
-.container {
-  max-width: 1200px;
+.header h1 {
   margin: 0 auto;
-  padding: 30px 20px;
-}
-
-/* Empty Cart */
-.empty-cart {
-  text-align: center;
-  padding: 80px 20px;
-  background-color: white;
-  border-radius: 20px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-}
-
-.empty-icon {
-  font-size: 100px;
-  margin-bottom: 30px;
-}
-
-.empty-cart h2 {
-  margin: 0 0 15px 0;
-  font-size: 28px;
+  font-size: 1.5rem;
   color: #333;
 }
 
-.empty-cart p {
-  margin: 0 0 30px 0;
-  color: #666;
-  font-size: 16px;
-}
-
-.btn-primary {
-  background-color: #667eea;
-  color: white;
-  border: none;
-  padding: 15px 40px;
-  border-radius: 25px;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: bold;
-  transition: background-color 0.3s;
-}
-
-.btn-primary:hover {
-  background-color: #5568d3;
-}
-
-/* Cart Content */
-.cart-content {
-  display: grid;
-  grid-template-columns: 1fr 400px;
+/* Estilos del carrito */
+.container {
+  display: flex;
   gap: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
 }
 
+.cart-content {
+  display: flex;
+  gap: 30px;
+  width: 100%;
+}
+
+.cart-main {
+  flex: 2;
+}
+
+/* Tarjeta del restaurante */
 .restaurant-card {
-  background-color: white;
-  padding: 20px;
-  border-radius: 15px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  background: white;
+  border-radius: 12px;
+  padding: 15px;
   margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 .restaurant-header {
@@ -426,51 +277,46 @@ const confirmarPedido = async () => {
   align-items: center;
 }
 
-.restaurant-header h3 {
-  margin: 0;
-  font-size: 20px;
-}
-
 .btn-clear-cart {
-  background-color: #ff4757;
+  background: #ff4444;
   color: white;
   border: none;
-  padding: 8px 16px;
+  padding: 8px 15px;
   border-radius: 20px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-/* Cart Items */
+/* Items del carrito */
 .cart-items {
-  background-color: white;
-  padding: 25px;
-  border-radius: 15px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-  margin-bottom: 20px;
-}
-
-.cart-items h3 {
-  margin: 0 0 20px 0;
-  font-size: 20px;
+  margin-bottom: 30px;
 }
 
 .cart-item {
   display: flex;
-  gap: 20px;
-  padding: 20px 0;
-  border-bottom: 1px solid #f0f0f0;
+  background: white;
+  border-radius: 12px;
+  padding: 15px;
+  margin-bottom: 15px;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.cart-item:last-child {
-  border-bottom: none;
+.cart-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .item-image {
-  width: 100px;
-  height: 100px;
+  width: 80px;
+  height: 80px;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 8px;
+  margin-right: 20px;
 }
 
 .item-info {
@@ -479,397 +325,299 @@ const confirmarPedido = async () => {
 
 .item-info h4 {
   margin: 0 0 5px 0;
-  font-size: 18px;
   color: #333;
+  font-size: 1rem;
 }
 
 .item-description {
-  margin: 0 0 10px 0;
+  margin: 0;
   color: #666;
-  font-size: 14px;
-}
-
-.item-notes {
-  background-color: #fff9e6;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #856404;
+  font-size: 0.85rem;
 }
 
 .item-actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.item-price {
-  font-size: 16px;
-  color: #667eea;
-  font-weight: bold;
+  align-items: center;
+  gap: 20px;
 }
 
 .quantity-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
-  background-color: #f5f5f5;
-  border-radius: 25px;
-  padding: 5px;
+  gap: 8px;
+  background: #f1f3f5;
+  padding: 4px 12px;
+  border-radius: 50px;
+  border: 1px solid #dee2e6;
 }
 
 .qty-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  width: 28px;
+  height: 28px;
   border: none;
-  background-color: white;
+  background: white;
+  border-radius: 50%;
   cursor: pointer;
-  font-size: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s;
+  font-size: 16px;
+  color: #333;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.2s;
 }
 
 .qty-btn:hover {
-  background-color: #667eea;
-  color: white;
+  background: #e9ecef;
+  transform: translateY(-1px);
+}
+
+.qty-btn:active {
+  transform: translateY(0);
 }
 
 .quantity {
-  min-width: 30px;
+  min-width: 24px;
   text-align: center;
-  font-weight: bold;
-}
-
-.item-total {
-  font-size: 18px;
-  font-weight: bold;
+  font-weight: 600;
   color: #333;
 }
 
+.item-price {
+  font-weight: 600;
+  min-width: 80px;
+  text-align: right;
+}
+
+.item-total {
+  font-weight: 600;
+  min-width: 80px;
+  text-align: right;
+}
+
 .btn-remove {
-  background: none;
-  border: none;
+  background: #fff5f5;
+  border: 1px solid #ffc9c9;
+  color: #ff6b6b;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  font-size: 20px;
-  padding: 5px;
-  opacity: 0.5;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
 }
 
 .btn-remove:hover {
-  opacity: 1;
+  background: #ffebee;
+  color: #f44336;
+  transform: translateY(-1px);
 }
 
-/* Add Notes Section */
+/* Sección de notas */
 .add-notes-section {
-  background-color: white;
-  padding: 25px;
-  border-radius: 15px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  margin-top: 30px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e9ecef;
 }
 
 .add-notes-section h3 {
   margin: 0 0 15px 0;
-  font-size: 18px;
+  color: #333;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.notes-container {
+  position: relative;
 }
 
 .notes-textarea {
   width: 100%;
-  min-height: 80px;
-  padding: 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 10px;
-  font-size: 14px;
+  min-height: 100px;
+  padding: 15px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
   font-family: inherit;
+  font-size: 0.95rem;
   resize: vertical;
-  box-sizing: border-box;
+  transition: border-color 0.2s;
+  background: white;
+  color: #333;
 }
 
 .notes-textarea:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
 }
 
-.add-notes-section small {
-  color: #999;
-  font-size: 12px;
+.char-count {
+  text-align: right;
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin-top: 5px;
 }
 
-/* Order Summary */
+/* Resumen del pedido */
 .order-summary {
+  flex: 1;
   position: sticky;
   top: 20px;
   height: fit-content;
 }
 
 .summary-card {
-  background-color: white;
-  padding: 25px;
-  border-radius: 15px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
 }
 
 .summary-card h3 {
-  margin: 0 0 20px 0;
-  font-size: 20px;
-}
-
-.delivery-section,
-.payment-section {
-  margin-bottom: 20px;
-}
-
-.delivery-section h4,
-.payment-section h4 {
-  margin: 0 0 10px 0;
-  font-size: 16px;
+  margin-top: 0;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
   color: #333;
-}
-
-.address-box {
-  padding: 15px;
-  background-color: #f5f5f5;
-  border-radius: 10px;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: border-color 0.3s;
-}
-
-.address-box:hover {
-  border-color: #667eea;
-}
-
-.address-box p {
-  margin: 0;
-  color: #333;
-}
-
-.add-address {
-  color: #667eea;
-  font-weight: 600;
-}
-
-.payment-select {
-  width: 100%;
-  padding: 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 10px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.payment-select:focus {
-  outline: none;
-  border-color: #667eea;
-}
-
-.summary-details {
-  padding: 20px 0;
-  border-top: 2px solid #f0f0f0;
-  border-bottom: 2px solid #f0f0f0;
-  margin-bottom: 20px;
+  font-size: 1.2rem;
 }
 
 .summary-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 12px;
-  font-size: 15px;
+  margin: 15px 0;
 }
 
 .summary-row.total {
-  font-size: 20px;
-  font-weight: bold;
-  margin-top: 15px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 20px;
   padding-top: 15px;
-  border-top: 2px solid #f0f0f0;
+  border-top: 1px solid #eee;
 }
 
-.summary-row.total span:last-child {
-  color: #667eea;
-}
-
-.discount {
-  color: #10ac84;
-  font-weight: 600;
-}
-
-.promo-section {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.promo-input {
-  flex: 1;
-  padding: 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 10px;
-  font-size: 14px;
-}
-
-.promo-input:focus {
-  outline: none;
-  border-color: #667eea;
-}
-
-.btn-apply-promo {
-  background-color: #10ac84;
-  color: white;
-  border: none;
-  padding: 12px 20px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
+.divider {
+  height: 1px;
+  background: #eee;
+  margin: 15px 0;
 }
 
 .btn-checkout {
   width: 100%;
-  padding: 16px;
-  background-color: #667eea;
+  padding: 15px;
+  background: #4CAF50;
   color: white;
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  font-size: 18px;
-  font-weight: bold;
-  transition: background-color 0.3s;
+  margin-top: 20px;
+  transition: background 0.2s;
 }
 
-.btn-checkout:hover:not(:disabled) {
-  background-color: #5568d3;
+.btn-checkout:hover {
+  background: #43A047;
 }
 
 .btn-checkout:disabled {
-  background-color: #ccc;
+  background: #cccccc;
   cursor: not-allowed;
 }
 
-.terms-text {
+/* Carrito vacío */
+.empty-cart {
   text-align: center;
-  font-size: 12px;
-  color: #999;
-  margin: 15px 0 0 0;
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background-color: white;
-  border-radius: 20px;
-  width: 90%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 20px;
-}
-
-.btn-close-modal {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #999;
-}
-
-.modal-body {
-  padding: 20px;
-}
-
-.address-textarea {
+  padding: 50px 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
   width: 100%;
-  min-height: 120px;
-  padding: 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 10px;
-  font-size: 14px;
-  font-family: inherit;
-  resize: vertical;
-  box-sizing: border-box;
 }
 
-.address-textarea:focus {
-  outline: none;
-  border-color: #667eea;
+.empty-icon {
+  font-size: 60px;
+  margin-bottom: 20px;
+  color: #e0e0e0;
 }
 
-.modal-footer {
-  display: flex;
-  gap: 10px;
-  padding: 20px;
-  border-top: 1px solid #f0f0f0;
+.empty-cart h2 {
+  margin: 0 0 10px 0;
+  color: #333;
 }
 
-.btn-cancel {
-  flex: 1;
-  padding: 12px;
-  background-color: #f5f5f5;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 16px;
+.empty-cart p {
+  color: #666;
+  margin-bottom: 20px;
 }
 
-.btn-save {
-  flex: 1;
-  padding: 12px;
-  background-color: #667eea;
+.btn-primary {
+  background: #4CAF50;
   color: white;
   border: none;
-  border-radius: 10px;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-weight: 500;
   cursor: pointer;
-  font-size: 16px;
-  font-weight: 600;
+  transition: background 0.2s;
 }
 
-@media (max-width: 1024px) {
-  .cart-content {
-    grid-template-columns: 1fr;
-  }
+.btn-primary:hover {
+  background: #43A047;
+}
 
+/* Responsive */
+@media (max-width: 992px) {
+  .container {
+    flex-direction: column;
+  }
+  
+  .cart-content {
+    flex-direction: column;
+  }
+  
   .order-summary {
     position: static;
+    margin-top: 30px;
   }
 }
 
 @media (max-width: 768px) {
   .cart-item {
     flex-direction: column;
+    text-align: center;
   }
-
+  
+  .item-image {
+    margin: 0 auto 15px;
+  }
+  
   .item-actions {
-    flex-direction: row;
-    justify-content: space-between;
-    width: 100%;
+    margin-top: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .quantity-controls {
+    margin: 10px 0;
+  }
+  
+  .btn-back {
+    position: absolute;
+    left: 20px;
+  }
+  
+  .header h1 {
+    text-align: center;
+    margin-left: 40px;
+  }
+  
+  .add-notes-section {
+    margin: 20px 0;
+    padding: 15px;
   }
 }
 </style>

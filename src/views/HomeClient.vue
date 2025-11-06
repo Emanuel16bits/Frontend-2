@@ -88,12 +88,23 @@
               <span v-if="restaurant.promo" class="promo-badge">{{ restaurant.promo }}</span>
             </div>
             <div class="restaurant-info">
-              <h3>{{ restaurant.nombre }}</h3>
+              <div class="restaurant-header">
+                <h3>{{ restaurant.nombre }}</h3>
+                <span class="status-badge" :class="{ 'open': isRestaurantOpen(restaurant.horarioApertura, restaurant.horarioCierre), 'closed': !isRestaurantOpen(restaurant.horarioApertura, restaurant.horarioCierre) }">
+                  {{ isRestaurantOpen(restaurant.horarioApertura, restaurant.horarioCierre) ? 'Abierto' : 'Cerrado' }}
+                </span>
+              </div>
               <p class="restaurant-category">{{ restaurant.categoria }}</p>
               <div class="restaurant-meta">
-                <span class="rating">{{ restaurant.rating || 'N/A' }}</span>
-                <span class="delivery-time">{{ restaurant.deliveryTime || '-' }} min</span>
-                <span class="delivery-cost">${{ restaurant.deliveryCost || '-' }}</span>
+                <span class="rating" v-if="restaurant.rating > 0">
+                  <i class="fas fa-star"></i> {{ Number(restaurant.rating).toFixed(1) }}
+                </span>
+                <span class="delivery-time" v-if="restaurant.deliveryTime > 0">
+                  <i class="fas fa-clock"></i> {{ restaurant.deliveryTime }} min
+                </span>
+                <span class="schedule" v-if="restaurant.horarioApertura && restaurant.horarioCierre">
+                  <i class="far fa-clock"></i> {{ formatTime(restaurant.horarioApertura) }} - {{ formatTime(restaurant.horarioCierre) }}
+                </span>
               </div>
             </div>
           </div>
@@ -121,7 +132,7 @@
           <div 
             v-for="restaurant in filteredRestaurants" 
             :key="restaurant.id"
-            class="restaurant-card"
+            :class="['restaurant-card', { 'is-open': restaurant.isOpen }]"
             @click="viewRestaurant(restaurant.id)"
           >
             <div class="restaurant-image">
@@ -133,12 +144,23 @@
               <span v-if="!restaurant.isOpen" class="closed-badge">Cerrado</span>
             </div>
             <div class="restaurant-info">
-              <h3>{{ restaurant.nombre }}</h3>
+              <div class="restaurant-header">
+                <h3>{{ restaurant.nombre }}</h3>
+                <span class="status-badge" :class="{ 'open': isRestaurantOpen(restaurant.horarioApertura, restaurant.horarioCierre), 'closed': !isRestaurantOpen(restaurant.horarioApertura, restaurant.horarioCierre) }">
+                  {{ isRestaurantOpen(restaurant.horarioApertura, restaurant.horarioCierre) ? 'Abierto' : 'Cerrado' }}
+                </span>
+              </div>
               <p class="restaurant-category">{{ restaurant.categoria }}</p>
               <div class="restaurant-meta">
-                <span class="rating">{{ restaurant.rating || 'N/A' }}</span>
-                <span class="delivery-time">{{ restaurant.deliveryTime || '-' }} min</span>
-                <span class="delivery-cost">${{ restaurant.deliveryCost || '-' }}</span>
+                <span class="rating" v-if="restaurant.rating > 0">
+                  <i class="fas fa-star"></i> {{ Number(restaurant.rating).toFixed(1) }}
+                </span>
+                <span class="delivery-time" v-if="restaurant.deliveryTime > 0">
+                  <i class="fas fa-clock"></i> {{ restaurant.deliveryTime }} min
+                </span>
+                <span class="schedule" v-if="restaurant.horarioApertura && restaurant.horarioCierre">
+                  <i class="far fa-clock"></i> {{ formatTime(restaurant.horarioApertura) }} - {{ formatTime(restaurant.horarioCierre) }}
+                </span>
               </div>
             </div>
           </div>
@@ -176,6 +198,34 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+
+// Función para formatear la hora (HH:MM:SS a HH:MM)
+const formatTime = (timeString) => {
+  if (!timeString) return ''
+  return timeString.slice(0, 5) // Tomar solo horas y minutos
+}
+
+// Función para verificar si el restaurante está abierto según la hora actual
+const isRestaurantOpen = (horarioApertura, horarioCierre) => {
+  try {
+    if (!horarioApertura || !horarioCierre) return false
+    
+    const now = new Date()
+    const [hours, minutes] = [now.getHours(), now.getMinutes()]
+    const currentTime = hours * 60 + minutes
+    
+    const [openH, openM] = horarioApertura.split(':').map(Number)
+    const [closeH, closeM] = horarioCierre.split(':').map(Number)
+    
+    const openTime = openH * 60 + openM
+    const closeTime = closeH * 60 + closeM
+    
+    return currentTime >= openTime && currentTime <= closeTime
+  } catch (error) {
+    console.error('Error al verificar horario:', error)
+    return false
+  }
+}
 import { useCartStore } from '@/stores/cartStore'
 import axios from 'axios'
 
@@ -207,14 +257,16 @@ const featuredRestaurants = computed(() => {
 })
 
 const filteredRestaurants = computed(() => {
-  let filtered = restaurants.value
+  let filtered = [...restaurants.value]
 
+  // Filtrar por categoría
   if (selectedCategory.value !== 'todos') {
     filtered = filtered.filter(r => 
       r.categoria.toLowerCase() === selectedCategory.value.toLowerCase()
     )
   }
 
+  // Filtrar por búsqueda
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(r => 
@@ -223,7 +275,11 @@ const filteredRestaurants = computed(() => {
     )
   }
 
-  return filtered
+  // Ordenar: primero los abiertos, luego los cerrados
+  return filtered.sort((a, b) => {
+    if (a.isOpen === b.isOpen) return 0
+    return a.isOpen ? -1 : 1
+  })
 })
 
 // Funciones
@@ -267,12 +323,61 @@ onMounted(async () => {
   try {
     loading.value = true
     const res = await axios.get('http://localhost:3000/restaurants', { withCredentials: true })
-    restaurants.value = res.data
+    
+    console.log('=== DATOS CRUDOS DE LA API ===')
+    console.log('Tipo de datos recibidos:', Array.isArray(res.data) ? 'Array' : typeof res.data)
+    console.log('Primer elemento:', res.data[0])
+    console.log('Propiedades del primer elemento:', Object.keys(res.data[0]))
+    console.log('==============================')
+    
+    // Mapear los datos del backend al formato esperado
+    restaurants.value = res.data.map((restaurant, index) => {
+      // Función para convertir a número o devolver valor por defecto
+      const toNumber = (value, defaultValue = 0) => {
+        if (value === null || value === undefined) return defaultValue
+        const num = Number(value)
+        return isNaN(num) ? defaultValue : num
+      }
+
+      // Función para formatear el precio
+      const formatPrice = (value) => {
+        const num = toNumber(value, 0)
+        return num > 0 ? num.toString() : '0'
+      }
+
+      // Función para determinar si está abierto
+      const isOpen = () => {
+        if (restaurant.estado !== undefined) {
+          return String(restaurant.estado).toLowerCase() === 'abierto'
+        }
+        if (restaurant.isOpen !== undefined) {
+          return Boolean(restaurant.isOpen)
+        }
+        return true // Por defecto asumir que está abierto
+      }
+
+      const processed = {
+        id: restaurant.id || restaurant._id || `rest-${index}`,
+        nombre: String(restaurant.nombre || restaurant.name || 'Restaurante sin nombre').trim(),
+        categoria: String(restaurant.categoria || restaurant.category || 'Sin categoría').trim(),
+        rating: toNumber(restaurant.rating, 0),
+        deliveryTime: toNumber(restaurant.tiempo_entrega || restaurant.deliveryTime, 0),
+        horarioApertura: restaurant.horarioApertura || '09:00:00',
+        horarioCierre: restaurant.horarioCierre || '22:00:00',
+        image: restaurant.imagen || restaurant.image || 'https://via.placeholder.com/300x200',
+        isOpen: isOpen(),
+        promo: restaurant.promocion || restaurant.promo || null
+      }
+
+      console.log(`\n--- Restaurante procesado ${index + 1} ---`)
+      console.log('Datos procesados:', JSON.parse(JSON.stringify(processed)))
+      return processed
+    })
 
     const favRes = await axios.get('http://localhost:3000/favorites', { withCredentials: true })
     favorites.value = favRes.data.map(f => f.restaurantId)
   } catch (error) {
-    console.error(error)
+    console.error('Error al cargar los restaurantes:', error)
   } finally {
     loading.value = false
   }
@@ -283,9 +388,6 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('.user-section')) showProfileMenu.value = false
 })
 </script>
-
-
-
 
 <style scoped>
 * {
@@ -603,34 +705,72 @@ document.addEventListener('click', (e) => {
 /* Grid de restaurantes */
 .restaurants-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 25px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
 }
 
 /* Tarjeta de restaurante */
 .restaurant-card {
   background: white;
-  border-radius: 15px;
+  border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
   cursor: pointer;
-  transition: all 0.3s;
-  scroll-snap-align: start;
+  position: relative;
+  height: 240px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #eee;
 }
 
 .restaurant-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  transform: translateY(-4px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
 }
 
-.restaurant-card.featured {
-  min-width: 350px;
+/* Estado cerrado */
+.restaurant-card:not(.is-open) {
+  opacity: 0.8;
+  background-color: #f9f9f9;
+}
+
+.restaurant-card:not(.is-open) .restaurant-image {
+  filter: grayscale(30%);
+}
+
+/* Header del restaurante */
+.restaurant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+/* Badge de estado */
+.status-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.status-badge.open {
+  background-color: #e3f9e5;
+  color: #1a7f37;
+}
+
+.status-badge.closed {
+  background-color: #ffebe9;
+  color: #cf222e;
 }
 
 .restaurant-image {
+  height: 120px;
   position: relative;
-  width: 100%;
-  height: 200px;
   overflow: hidden;
 }
 
@@ -642,100 +782,107 @@ document.addEventListener('click', (e) => {
 }
 
 .restaurant-card:hover .restaurant-image img {
-  transform: scale(1.1);
-}
-
-.favorite-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: rgba(255, 255, 255, 0.9);
-  border: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 1.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s;
-  backdrop-filter: blur(10px);
-}
-
-.favorite-btn:hover {
-  background: white;
-  transform: scale(1.1);
-}
-
-.favorite-btn .fa-solid {
-  color: #ff4757;
-}
-
-.favorite-btn .fa-regular {
-  color: #666;
-}
-
-.promo-badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: #ff4757;
-  color: white;
-  padding: 5px 15px;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: bold;
-}
-
-.closed-badge {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  font-weight: bold;
+  transform: scale(1.03);
 }
 
 .restaurant-info {
-  padding: 20px;
+  padding: 10px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
-.restaurant-info h3 {
-  margin: 0 0 5px 0;
+.restaurant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.restaurant-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
   color: #333;
-  font-size: 1.3rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.status-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.status-badge.open {
+  background-color: #e3f9e5;
+  color: #1a7f37;
+}
+
+.status-badge.closed {
+  background-color: #ffebe9;
+  color: #cf222e;
 }
 
 .restaurant-category {
   color: #666;
-  margin: 0 0 15px 0;
-  font-size: 0.9rem;
+  font-size: 0.75rem;
+  margin: 0 0 6px 0;
 }
 
 .restaurant-meta {
   display: flex;
-  gap: 15px;
+  align-items: center;
+  gap: 12px;
+  margin-top: auto;
+  font-size: 0.75rem;
+  color: #666;
   flex-wrap: wrap;
 }
 
-.restaurant-meta span {
+.rating {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 0.9rem;
-  color: #666;
+  gap: 3px;
+  color: #ffc107;
+  font-weight: 600;
+  font-size: 0.8rem;
+  background: rgba(255, 193, 7, 0.1);
+  padding: 2px 6px;
+  border-radius: 10px;
 }
 
-.rating {
-  color: #ffa500 !important;
-  font-weight: bold;
+.delivery-time,
+.schedule {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.schedule i {
+  color: #6b7280;
+  margin-right: 2px;
+}
+
+.delivery-time i {
+  color: #4a6cf7;
+}
+
+.schedule i {
+  color: #6b7280;
+  margin-right: 4px;
+}
+
+/* Iconos */
+.fas {
+  font-size: 0.8em;
 }
 
 /* Estados de carga y vacío */
