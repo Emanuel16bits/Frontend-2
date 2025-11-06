@@ -1,207 +1,296 @@
 <template>
-  <div class="delivery-home-container">
-    <!-- Header -->
-    <header class="delivery-header">
-      <div class="header-content">
-        <h1>comidApp - Panel Repartidor</h1>
-        <div class="user-section">
-          <button class="btn-profile" @click="showProfileMenu = !showProfileMenu">
-            <i class="fa-solid fa-user-circle"></i>
-            {{ driver?.nombre || 'Repartidor' }}
-          </button>
+  <div class="delivery-orders">
+    <h2>Pedidos para entregar</h2>
+    
+    <div v-if="loading" class="loading">Cargando pedidos...</div>
+    
+    <div v-else-if="orders.length === 0" class="no-orders">
+      No hay pedidos disponibles
+    </div>
+    
+    <div v-else class="orders-grid">
+      <div v-for="order in orders" :key="order.id" class="order-card">
+        <div class="order-header">
+          <h3>Pedido #{{ order.id }}</h3>
+          <span :class="'status-' + order.estado">
+            {{ formatStatus(order.estado) }}
+          </span>
+        </div>
+        
+        <div class="order-details">
+          <p><strong>Cliente:</strong> {{ order.usuario?.nombre || 'Cliente' }}</p>
+          <p><strong>Dirección:</strong> {{ order.direccionEntrega || 'Sin dirección' }}</p>
+          <p><strong>Total:</strong> ${{ Number(order.precioTotal || 0).toFixed(2) }}</p>
+        </div>
 
-          <!-- Menú desplegable de perfil -->
-          <div v-if="showProfileMenu" class="profile-dropdown">
-            <button @click="goTo('/perfil-repartidor')">
-              <i class="fa-solid fa-user"></i> Mi Perfil
-            </button>
-            <button @click="goTo('/historial-entregas')">
-              <i class="fa-solid fa-history"></i> Historial de entregas
-            </button>
-            <button @click="logout" class="logout-btn">
-              <i class="fa-solid fa-right-from-bracket"></i> Cerrar sesión
-            </button>
+        <div class="order-items" v-if="order.items && order.items.length > 0">
+          <h4>Productos:</h4>
+          <div v-for="item in order.items" :key="item.id" class="order-item">
+            <span class="item-quantity">{{ item.cantidad }}x</span>
+            <span class="item-name">{{ item.producto?.nombre || 'Producto' }}</span>
           </div>
         </div>
-      </div>
-    </header>
 
-    <main class="delivery-main">
-      <!-- Estado y ganancias -->
-      <section class="driver-info" v-if="driver">
-        <p>
-          <strong>Estado:</strong>
-          <span :class="driver.disponible ? 'activo' : 'inactivo'">
-            {{ driver.disponible ? 'Activo' : 'Inactivo' }}
-          </span>
-          <button @click="toggleDisponibilidad">
-            {{ driver.disponible ? 'Desactivar' : 'Activar' }}
+        <div class="order-actions">
+          <button 
+            v-if="order.estado === 'pendiente'" 
+            @click="updateOrderStatus(order.id, 'en_camino')"
+            class="btn-accept"
+          >
+            Aceptar Pedido
           </button>
-        </p>
-        <p><strong>Ganancias totales:</strong> ${{ driver.gananciasTotales || 0 }}</p>
-        <p><strong>Calificación:</strong> ⭐ {{ driver.calificacion || 0 }}</p>
-      </section>
 
-      <!-- Pedidos asignados -->
-      <section class="orders-section" v-if="orders.length > 0">
-        <h2>Pedidos disponibles / asignados</h2>
-        <ul>
-          <li v-for="order in orders" :key="order.id" class="order-card">
-            <div class="order-info">
-              <p><strong>Pedido #{{ order.id }}</strong></p>
-              <p><strong>Cliente:</strong> {{ order.clienteNombre }}</p>
-              <p><strong>Dirección de entrega:</strong> {{ order.direccionEntrega }}</p>
-              <p><strong>Contenido:</strong> {{ order.contenido }}</p>
-              <p><strong>Estado:</strong> {{ order.estado }}</p>
-            </div>
-            <div class="order-actions">
-              <button v-if="order.estado === 'nuevo'" @click="aceptarPedido(order.id)">Aceptar</button>
-              <button v-if="order.estado === 'nuevo'" @click="rechazarPedido(order.id)">Rechazar</button>
-              <button v-if="order.estado === 'aceptado'" @click="marcarRecolectado(order.id)">Recolectado</button>
-              <button v-if="order.estado === 'en camino'" @click="marcarEntregado(order.id)">Entregado</button>
-              <button @click="contactarCliente(order.clienteTelefono)">Contactar cliente</button>
-            </div>
-          </li>
-        </ul>
-      </section>
-
-      <!-- Pedidos vacíos -->
-      <div v-else class="empty-state">
-        <i class="fa-solid fa-box"></i>
-        <p>No hay pedidos disponibles</p>
+          <button 
+            v-else-if="order.estado === 'en_camino'" 
+            @click="updateOrderStatus(order.id, 'entregada')"
+            class="btn-deliver"
+          >
+            Marcar como Entregado
+          </button>
+        </div>
       </div>
-    </main>
+    </div>
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted } from 'vue'
+<script>
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { defineStore } from 'pinia'
 import axios from 'axios'
 
-const router = useRouter()
-const driver = ref(null)
-const orders = ref([])
-const loading = ref(true)
-const showProfileMenu = ref(false)
+const API_URL = 'http://localhost:3000'
 
-// Driver ID guardado al iniciar sesión
-const driverId = localStorage.getItem('driverId')
+// Definir el store de autenticación
+export const useAuthStore = defineStore('auth', () => {
+  const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
+  const token = ref(localStorage.getItem('token'))
+  const isAuthenticated = computed(() => !!token.value)
+  const userId = computed(() => user.value?.id || null)
 
-// Fetch datos del driver y pedidos asignados
-const fetchData = async () => {
-  if (!driverId) return
-  loading.value = true
-  try {
-    const resDriver = await axios.get(`http://localhost:3000/drivers/${driverId}`)
-    driver.value = resDriver.data
-
-    const resOrders = await axios.get(`http://localhost:3000/orders?driverId=${driverId}&estado=nuevo,aceptado,en camino`)
-    orders.value = resOrders.data
-  } catch (err) {
-    console.error('Error cargando datos:', err)
-  } finally {
-    loading.value = false
+  return {
+    user,
+    token,
+    isAuthenticated,
+    userId
   }
-}
-
-// Funciones de pedidos
-const aceptarPedido = async (orderId) => {
-  try {
-    await axios.patch(`http://localhost:3000/orders/${orderId}`, { estado: 'aceptado', driverId })
-    fetchData()
-  } catch (err) {
-    console.error(err)
-  }
-}
-
-const rechazarPedido = async (orderId) => {
-  try {
-    await axios.patch(`http://localhost:3000/orders/${orderId}`, { estado: 'rechazado', driverId: null })
-    fetchData()
-  } catch (err) {
-    console.error(err)
-  }
-}
-
-const marcarRecolectado = async (orderId) => {
-  try {
-    await axios.patch(`http://localhost:3000/orders/${orderId}`, { estado: 'en camino' })
-    fetchData()
-  } catch (err) {
-    console.error(err)
-  }
-}
-
-const marcarEntregado = async (orderId) => {
-  try {
-    await axios.patch(`http://localhost:3000/orders/${orderId}`, { estado: 'entregado' })
-    fetchData()
-  } catch (err) {
-    console.error(err)
-  }
-}
-
-// Contacto con cliente/vendor
-const contactarCliente = (telefono) => {
-  window.open(`tel:${telefono}`, '_self')
-}
-
-// Toggle disponibilidad
-const toggleDisponibilidad = async () => {
-  if (!driver.value) return
-  try {
-    const nuevaDisponibilidad = !driver.value.disponible
-    await axios.patch(`http://localhost:3000/drivers/${driver.value.id}`, { disponible: nuevaDisponibilidad })
-    driver.value.disponible = nuevaDisponibilidad
-  } catch (err) {
-    console.error(err)
-  }
-}
-
-// Navegación y logout
-const goTo = (path) => { showProfileMenu.value = false; router.push(path) }
-const logout = () => { localStorage.removeItem('driverId'); router.push('/login') }
-
-onMounted(fetchData)
-
-// Cerrar menú de perfil al hacer click fuera
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.user-section')) showProfileMenu.value = false
 })
+
+export default {
+  setup() {
+    const orders = ref([])
+    const loading = ref(true)
+    const router = useRouter()
+    const authStore = useAuthStore()
+    const driverId = ref(null)
+
+    // Formatear el estado para mostrar
+    const formatStatus = (status) => {
+      const statusMap = {
+        'pendiente': 'Pendiente',
+        'en_preparacion': 'En preparación',
+        'en_camino': 'En camino',
+        'entregada': 'Entregada',
+        'cancelada': 'Cancelada'
+      }
+      return statusMap[status] || status
+    }
+
+    // Obtener pedidos
+    const fetchOrders = async () => {
+      try {
+        loading.value = true
+        console.log('Obteniendo pedidos...')
+        
+        // Verificar si hay un usuario autenticado
+        if (!authStore.isAuthenticated) {
+          console.error('Usuario no autenticado')
+          router.push('/login')
+          return
+        }
+        
+        driverId.value = authStore.userId
+        console.log('ID del repartidor:', driverId.value)
+
+        // Obtener pedidos pendientes (sin repartidor asignado) y en camino
+        const [pendingResponse, inProgressResponse] = await Promise.all([
+          axios.get(`${API_URL}/orders?estado=pendiente&_expand=usuario&_expand=items`),
+          axios.get(`${API_URL}/orders?estado=en_camino&repartidorId=${driverId.value}&_expand=usuario&_expand=items`)
+        ])
+        
+        // Combinar y eliminar duplicados
+        const allOrders = [...pendingResponse.data, ...inProgressResponse.data]
+        orders.value = allOrders.filter((order, index, self) => 
+          index === self.findIndex(o => o.id === order.id)
+        )
+        
+        console.log('Pedidos cargados:', orders.value)
+      } catch (error) {
+        console.error('Error al cargar pedidos:', error)
+        alert('No se pudieron cargar los pedidos. Intenta de nuevo más tarde.')
+      } finally {
+        loading.value = false
+      }
+    }
+
+    // Actualizar estado del pedido
+    const updateOrderStatus = async (orderId, newStatus) => {
+      try {
+        const updateData = { 
+          estado: newStatus,
+          // Si se está aceptando el pedido, asignar al conductor actual
+          ...(newStatus === 'en_camino' && { repartidorId: driverId.value })
+        }
+        
+        console.log('Actualizando pedido:', { orderId, ...updateData })
+        await axios.patch(`${API_URL}/orders/${orderId}`, updateData)
+        
+        // Actualizar la lista de pedidos
+        await fetchOrders()
+        
+      } catch (error) {
+        console.error('Error al actualizar el pedido:', {
+          error: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        })
+        alert('No se pudo actualizar el pedido. Intenta de nuevo.')
+      }
+    }
+
+    // Cargar pedidos al montar el componente
+    onMounted(fetchOrders)
+
+    return {
+      orders,
+      loading,
+      formatStatus,
+      updateOrderStatus
+    }
+  }
+}
 </script>
 
 <style scoped>
-.delivery-home-container { min-height: 100vh; background: #f5f5f5; font-family: Arial, sans-serif; }
+.delivery-orders {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
 
-/* Header */
-.delivery-header { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); padding: 20px; color:white; position: sticky; top:0; z-index:100; }
-.header-content { max-width:1400px; margin:auto; display:flex; justify-content:space-between; align-items:center; }
-.user-section { position: relative; }
-.btn-profile { background: rgba(255,255,255,0.2); border:none; padding:10px 20px; border-radius:25px; cursor:pointer; color:white; display:flex; align-items:center; gap:8px; font-weight:600; }
-.btn-profile:hover { background: rgba(255,255,255,0.3); }
-.profile-dropdown { position:absolute; top:100%; right:0; margin-top:10px; background:white; border-radius:15px; min-width:200px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.2); }
-.profile-dropdown button { width:100%; padding:15px 20px; border:none; background:white; cursor:pointer; display:flex; align-items:center; gap:10px; transition: background 0.2s; text-align:left; }
-.profile-dropdown button:hover { background:#f5f5f5; }
-.logout-btn i { color:#ff4757 !important; }
+.orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
 
-/* Main */
-.delivery-main { max-width:900px; margin:20px auto; padding:20px; }
-.activo { color:green; font-weight:bold; }
-.inactivo { color:red; font-weight:bold; }
+.order-card {
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
 
-button { margin-left:5px; padding:5px 10px; border-radius:6px; border:none; background:#007bff; color:white; cursor:pointer; }
-button:hover { background:#0056b3; }
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
 
-.driver-info { background:white; padding:20px; border-radius:15px; margin-bottom:30px; box-shadow:0 5px 20px rgba(0,0,0,0.1); }
-.orders-section ul { padding-left:0; list-style:none; }
-.order-card { background:white; padding:15px; margin-bottom:15px; border-radius:12px; box-shadow:0 5px 15px rgba(0,0,0,0.1); }
-.order-info p { margin:5px 0; }
-.order-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
-.empty-state { text-align:center; padding:30px; background:white; border-radius:15px; box-shadow:0 5px 20px rgba(0,0,0,0.1); }
-.empty-state i { font-size:3rem; color:#667eea; margin-bottom:15px; }
+.order-details {
+  margin: 15px 0;
+}
+
+.order-details p {
+  margin: 5px 0;
+}
+
+.order-items {
+  margin: 15px 0;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.order-item {
+  display: flex;
+  margin: 5px 0;
+  padding: 5px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.item-quantity {
+  font-weight: bold;
+  margin-right: 10px;
+  min-width: 30px;
+}
+
+.order-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+button {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn-accept {
+  background-color: #28a745;
+  color: white;
+}
+
+.btn-accept:hover {
+  background-color: #218838;
+}
+
+.btn-deliver {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-deliver:hover {
+  background-color: #0069d9;
+}
+
+.status-pendiente {
+  color: #ffc107;
+  font-weight: bold;
+}
+
+.status-en_preparacion {
+  color: #fd7e14;
+  font-weight: bold;
+}
+
+.status-en_camino {
+  color: #17a2b8;
+  font-weight: bold;
+}
+
+.status-entregada {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.status-cancelada {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.loading, .no-orders {
+  text-align: center;
+  padding: 40px;
+  font-size: 1.2em;
+  color: #666;
+}
 </style>
-
-
-
-

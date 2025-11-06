@@ -141,9 +141,12 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/services/cartStore'
+import { useAuthStore } from '@/stores/auth'
+import axios from 'axios';
 
 const router = useRouter()
 const cartStore = useCartStore()
+const authStore = useAuthStore()
 const notasPedido = ref('')
 const imageLoadError = ref({})
 
@@ -183,22 +186,41 @@ const getImageUrl = (imagePath) => {
 
 const confirmarPedido = async () => {
   try {
-    const pedido = {
-      items: cartStore.items,
-      notas: notasPedido.value,
-      total: cartStore.totalPrice,
-      restauranteId: cartStore.restaurantId
+    const userId = authStore.user.id; // Reemplaza con el ID del usuario real
+
+    // 1. Crear la orden vacía
+    const ordenResponse = await axios.post('http://localhost:3000/orders', {
+      precioTotal: cartStore.totalPrice,
+      idUsuario: userId
+    }, {
+      withCredentials: true
+    });
+
+    const ordenId = ordenResponse.data.id;
+
+    // 2. Agregar los items a la orden
+    for (const item of cartStore.items) {
+      await axios.post('http://localhost:3000/order-items', {
+        idOrden: ordenId,
+        idProducto: item.id,
+        cantidad: item.quantity
+      }, {
+        withCredentials: true
+      });
     }
-    
-    console.log('Pedido a confirmar:', pedido)
-    cartStore.clearCart()
-    router.push('/pedidos')
-    alert('¡Pedido realizado con éxito!')
+
+    // 3. Limpiar el carrito y redirigir
+    cartStore.clearCart();
+    router.push('/mis-pedidos');
+    alert('¡Pedido realizado con éxito!');
   } catch (error) {
-    console.error('Error al confirmar el pedido:', error)
-    alert('Ocurrió un error al procesar tu pedido. Por favor, inténtalo de nuevo.')
+    console.error('Error al confirmar el pedido:', error);
+    if (error.response) {
+      console.error('Detalles del error:', error.response.data);
+    }
+    alert('Ocurrió un error al procesar tu pedido. Por favor, inténtalo de nuevo.');
   }
-}
+};
 </script>
 
 <style scoped>

@@ -51,8 +51,8 @@ const routes = [
       component: () => import('../views/client/Cart.vue'),
       meta: { role: 'cliente' }
     },
-  {
-      path: '/pedidos',
+    {
+      path: '/mis-pedidos',
       component: () => import('../views/client/Orders.vue'),
       meta: { role: 'cliente' }
     },

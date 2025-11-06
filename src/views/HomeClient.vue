@@ -171,7 +171,7 @@
       <section class="quick-access">
         <h2>Acceso rápido</h2>
         <div class="quick-buttons">
-          <button class="quick-btn" @click="goTo('/pedidos')">
+          <button class="quick-btn" @click="goTo('/mis-pedidos')">
             <i class="fa-solid fa-receipt"></i>
             <span>Mis Pedidos</span>
           </button>

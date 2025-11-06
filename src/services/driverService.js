@@ -1,34 +1,48 @@
 // src/services/driverService.js
 import axios from 'axios'
 
-const API_URL = 'http://localhost:3000/drivers'
+const API_URL = 'http://localhost:3000'
 
+// Obtener todos los repartidores
 export const getDrivers = async () => {
-  const response = await axios.get(API_URL)
-  return response.data
+  try {
+    const response = await axios.get(`${API_URL}/users?rol=repartidor`)
+    return response.data
+  } catch (error) {
+    console.error('Error al obtener repartidores:', error)
+    throw error
+  }
 }
 
+// Obtener un repartidor por ID
 export const getDriver = async (id) => {
-  const response = await axios.get(`${API_URL}/${id}`)
-  return response.data
+  try {
+    const response = await axios.get(`${API_URL}/users/${id}?rol=repartidor`)
+    return response.data
+  } catch (error) {
+    console.error('Error al obtener el repartidor:', error)
+    throw error
+  }
 }
 
-export const createDriver = async (driverData) => {
-  const response = await axios.post(API_URL, driverData)
-  return response.data
+// Obtener pedidos asignados a un repartidor
+export const getDriverOrders = async (driverId) => {
+  try {
+    const response = await axios.get(`${API_URL}/orders?repartidorId=${driverId}`)
+    return response.data
+  } catch (error) {
+    console.error('Error al obtener los pedidos del repartidor:', error)
+    throw error
+  }
 }
 
-export const updateAvailability = async (id, disponible) => {
-  const response = await axios.patch(`${API_URL}/${id}/disponibilidad`, { disponible })
-  return response.data
-}
-
-export const updateEarnings = async (id, monto) => {
-  const response = await axios.patch(`${API_URL}/${id}/ganancias`, { monto })
-  return response.data
-}
-
-export const updateRating = async (id, calificacion) => {
-  const response = await axios.patch(`${API_URL}/${id}/calificacion`, { calificacion })
-  return response.data
+// Actualizar estado de un pedido
+export const updateOrderStatus = async (orderId, status) => {
+  try {
+    const response = await axios.patch(`${API_URL}/orders/${orderId}`, { estado: status })
+    return response.data
+  } catch (error) {
+    console.error('Error al actualizar el estado del pedido:', error)
+    throw error
+  }
 }
