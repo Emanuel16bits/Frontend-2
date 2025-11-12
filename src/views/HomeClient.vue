@@ -1,6 +1,5 @@
 <template>
   <div class="client-home-container">
-    <!-- Header -->
     <header class="client-header">
       <div class="header-content">
         <div class="logo-section">
@@ -8,33 +7,31 @@
         </div>
         <div class="user-section">
           <button class="btn-cart" @click="goTo('/carrito')">
-            🛒
+          🛒
             <span v-if="cartItemsCount > 0" class="cart-badge">{{ cartItemsCount }}</span>
           </button>
           <button class="btn-profile" @click="showProfileMenu = !showProfileMenu">
-            <i class="fa-solid fa-user-circle"></i>
+          👤
             {{ userName }}
           </button>
           
-          <!-- Menú desplegable de perfil -->
           <div v-if="showProfileMenu" class="profile-dropdown">
             <button @click="goTo('/perfil')">
-              <i class="fa-solid fa-user"></i> Mi Perfil
+              Mi Perfil
             </button>
             <button @click="goTo('/pedidos')">
-              <i class="fa-solid fa-receipt"></i> Mis Pedidos
+              Mis Pedidos
             </button>
             <button @click="goTo('/favoritos')">
-              <i class="fa-solid fa-heart"></i> Favoritos
+              Favoritos
             </button>
             <button @click="logout" class="logout-btn">
-              <i class="fa-solid fa-right-from-bracket"></i> Cerrar sesión
+              Cerrar sesión
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Barra de búsqueda -->
       <div class="search-bar">
         <i class="fa-solid fa-magnifying-glass"></i>
         <input 
@@ -48,7 +45,6 @@
         </button>
       </div>
 
-      <!-- Filtros de categorías -->
       <div class="categories-filter">
         <button 
           v-for="category in categories" 
@@ -62,7 +58,6 @@
     </header>
 
     <main class="client-main">
-      <!-- Banner promocional -->
       <section class="promo-banner">
         <div class="banner-content">
           <h2>¡Envío gratis en tu primer pedido!</h2>
@@ -70,7 +65,6 @@
         </div>
       </section>
 
-      <!-- Restaurantes destacados -->
       <section v-if="!searchQuery && selectedCategory === 'todos'" class="featured-section">
         <h2>Restaurantes destacados</h2>
         <div class="restaurants-carousel">
@@ -111,7 +105,6 @@
         </div>
       </section>
 
-      <!-- Listado de todos los restaurantes -->
       <section class="restaurants-section">
         <div class="section-header">
           <h2>{{ getSectionTitle() }}</h2>
@@ -167,7 +160,6 @@
         </div>
       </section>
 
-      <!-- Acceso rápido -->
       <section class="quick-access">
         <h2>Acceso rápido</h2>
         <div class="quick-buttons">
@@ -187,7 +179,6 @@
       </section>
     </main>
 
-    <!-- Botón flotante del carrito -->
     <button v-if="cartItemsCount > 0" class="fab-cart" @click="goTo('/carrito')">
       <i class="fa-solid fa-cart-shopping"></i>
       <span class="fab-badge">{{ cartItemsCount }}</span>
@@ -199,13 +190,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
-// Función para formatear la hora (HH:MM:SS a HH:MM)
 const formatTime = (timeString) => {
   if (!timeString) return ''
-  return timeString.slice(0, 5) // Tomar solo horas y minutos
+  return timeString.slice(0, 5)
 }
 
-// Función para verificar si el restaurante está abierto según la hora actual
 const isRestaurantOpen = (horarioApertura, horarioCierre) => {
   try {
     if (!horarioApertura || !horarioCierre) return false
@@ -249,7 +238,6 @@ const categories = [
   { id: 'bebidas', name: 'Bebidas' }
 ]
 
-// Computed
 const cartItemsCount = computed(() => cartStore.totalItems || 0)
 
 const featuredRestaurants = computed(() => {
@@ -259,14 +247,12 @@ const featuredRestaurants = computed(() => {
 const filteredRestaurants = computed(() => {
   let filtered = [...restaurants.value]
 
-  // Filtrar por categoría
   if (selectedCategory.value !== 'todos') {
     filtered = filtered.filter(r => 
       r.categoria.toLowerCase() === selectedCategory.value.toLowerCase()
     )
   }
 
-  // Filtrar por búsqueda
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(r => 
@@ -275,14 +261,12 @@ const filteredRestaurants = computed(() => {
     )
   }
 
-  // Ordenar: primero los abiertos, luego los cerrados
   return filtered.sort((a, b) => {
     if (a.isOpen === b.isOpen) return 0
     return a.isOpen ? -1 : 1
   })
 })
 
-// Funciones
 const getSectionTitle = () => {
   if (searchQuery.value) return `Resultados para "${searchQuery.value}"`
   if (selectedCategory.value !== 'todos') {
@@ -318,7 +302,6 @@ const viewRestaurant = (restaurantId) => { router.push(`/restaurante/${restauran
 const goTo = (path) => { showProfileMenu.value = false; router.push(path) }
 const logout = () => { router.push('/login') }
 
-// Cargar datos iniciales
 onMounted(async () => {
   try {
     loading.value = true
@@ -330,22 +313,18 @@ onMounted(async () => {
     console.log('Propiedades del primer elemento:', Object.keys(res.data[0]))
     console.log('==============================')
     
-    // Mapear los datos del backend al formato esperado
     restaurants.value = res.data.map((restaurant, index) => {
-      // Función para convertir a número o devolver valor por defecto
       const toNumber = (value, defaultValue = 0) => {
         if (value === null || value === undefined) return defaultValue
         const num = Number(value)
         return isNaN(num) ? defaultValue : num
       }
 
-      // Función para formatear el precio
       const formatPrice = (value) => {
         const num = toNumber(value, 0)
         return num > 0 ? num.toString() : '0'
       }
 
-      // Función para determinar si está abierto
       const isOpen = () => {
         if (restaurant.estado !== undefined) {
           return String(restaurant.estado).toLowerCase() === 'abierto'
@@ -353,7 +332,7 @@ onMounted(async () => {
         if (restaurant.isOpen !== undefined) {
           return Boolean(restaurant.isOpen)
         }
-        return true // Por defecto asumir que está abierto
+        return true 
       }
 
       const processed = {
@@ -383,7 +362,6 @@ onMounted(async () => {
   }
 })
 
-// Cerrar menú de perfil al hacer click fuera
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.user-section')) showProfileMenu.value = false
 })
@@ -399,7 +377,6 @@ document.addEventListener('click', (e) => {
   background: #f5f5f5;
 }
 
-/* Header */
 .client-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
@@ -544,7 +521,6 @@ document.addEventListener('click', (e) => {
   color: #ff4757 !important;
 }
 
-/* Barra de búsqueda */
 .search-bar {
   max-width: 1400px;
   margin: 0 auto 20px;
@@ -588,7 +564,6 @@ document.addEventListener('click', (e) => {
   color: #333;
 }
 
-/* Filtros de categorías */
 .categories-filter {
   max-width: 1400px;
   margin: 0 auto;
@@ -629,14 +604,12 @@ document.addEventListener('click', (e) => {
   color: #667eea;
 }
 
-/* Main content */
 .client-main {
   max-width: 1400px;
   margin: 0 auto;
   padding: 30px 20px;
 }
 
-/* Banner promocional */
 .promo-banner {
   background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
   border-radius: 20px;
@@ -658,7 +631,6 @@ document.addEventListener('click', (e) => {
   opacity: 0.9;
 }
 
-/* Secciones */
 .featured-section,
 .restaurants-section {
   margin-bottom: 50px;
@@ -684,7 +656,6 @@ document.addEventListener('click', (e) => {
   margin: 0;
 }
 
-/* Carrusel de destacados */
 .restaurants-carousel {
   display: flex;
   gap: 20px;
@@ -702,7 +673,6 @@ document.addEventListener('click', (e) => {
   border-radius: 10px;
 }
 
-/* Grid de restaurantes */
 .restaurants-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -710,7 +680,6 @@ document.addEventListener('click', (e) => {
   margin-top: 16px;
 }
 
-/* Tarjeta de restaurante */
 .restaurant-card {
   background: white;
   border-radius: 10px;
@@ -730,7 +699,6 @@ document.addEventListener('click', (e) => {
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* Estado cerrado */
 .restaurant-card:not(.is-open) {
   opacity: 0.8;
   background-color: #f9f9f9;
@@ -740,7 +708,6 @@ document.addEventListener('click', (e) => {
   filter: grayscale(30%);
 }
 
-/* Header del restaurante */
 .restaurant-header {
   display: flex;
   justify-content: space-between;
@@ -749,7 +716,6 @@ document.addEventListener('click', (e) => {
   margin-bottom: 4px;
 }
 
-/* Badge de estado */
 .status-badge {
   font-size: 0.7rem;
   font-weight: 600;
@@ -880,12 +846,9 @@ document.addEventListener('click', (e) => {
   margin-right: 4px;
 }
 
-/* Iconos */
 .fas {
   font-size: 0.8em;
 }
-
-/* Estados de carga y vacío */
 .loading-state,
 .empty-state {
   text-align: center;
@@ -925,7 +888,6 @@ document.addEventListener('click', (e) => {
   background: #5568d3;
 }
 
-/* Acceso rápido */
 .quick-access {
   margin-top: 50px;
 }
@@ -967,7 +929,6 @@ document.addEventListener('click', (e) => {
   font-weight: 600;
 }
 
-/* Botón flotante del carrito */
 .fab-cart {
   position: fixed;
   bottom: 30px;
@@ -1007,7 +968,6 @@ document.addEventListener('click', (e) => {
   border: 3px solid white;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .header-content {
     flex-direction: column;

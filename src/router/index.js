@@ -36,11 +36,15 @@ const routes = [
       meta: { role: 'vendedor' }
    },
    {
+    path: '/editar-restaurante/:id',
+    component: () => import('../components/RegisterRestaurant.vue'),
+    meta: { role: 'vendedor' }
+   },
+   {
     path: '/mis-productos',
     component: () => import('../views/vendor/products.vue'),
     meta: { role: 'vendedor' }
   },
-  // Agregar esta ruta al array de rutas
   {
     path: '/restaurante/:id',
     component: () => import('../components/RestaurantDetail.vue'),
@@ -73,21 +77,19 @@ const router = createRouter({
   routes,
 })
 
-// Guard global
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
 
-  // Si la ruta requiere rol
   if (to.meta.role) {
     if (!authStore.isAuthenticated) {
-      console.log('🔐 No autenticado, redirigiendo a login')
+      console.log('No autenticado')
       return next('/login')
     }
 
     if (authStore.userType !== to.meta.role) {
-      console.log(`🚫 Acceso denegado: Se requiere rol ${to.meta.role} pero el usuario tiene ${authStore.userType}`)
-      alert('No tienes permisos para acceder a esta sección.')
-      return next('/home') // Vuelve a Home para elegir rol
+      console.log(`Se requiere rol ${to.meta.role}`)
+      alert('No tienes permisos para acceder a esta sección')
+      return next('/home')
     }
   }
 

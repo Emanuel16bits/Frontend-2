@@ -1,181 +1,377 @@
 <template>
-  <div class="delivery-orders">
-    <h2>Pedidos para entregar</h2>
-    
-    <div v-if="loading" class="loading">Cargando pedidos...</div>
-    
-    <div v-else-if="orders.length === 0" class="no-orders">
-      No hay pedidos disponibles
+  <div class="home-delivery">
+    <div class="header-container">
+      <h2>Pedidos para entregar</h2>
+      <div class="button-group">
+        <button @click="showVehicleForm = true" class="btn-register-vehicle">
+          <i class="fa-solid fa-car"></i> Registrar Vehículo
+        </button>
+        <button @click="fetchDriverVehicles" class="btn-view-vehicles">
+          <i class="fa-solid fa-list"></i> Mis Vehículos
+        </button>
+      </div>
     </div>
     
+    <div v-if="showVehicleForm" class="modal-overlay" @click.self="showVehicleForm = false">
+      <div class="modal-content">
+        <button class="close-modal" @click="showVehicleForm = false">&times;</button>
+        <VehicleForm 
+          @saved="handleVehicleSaved"
+          @cancel="showVehicleForm = false"
+        />
+      </div>
+    </div>
+    
+    <div v-if="loading" class="loading">Cargando pedidos...</div>
+    <div v-else-if="error" class="error">{{ error }}</div>
+    <div v-else-if="orders.length === 0" class="no-orders">
+      No hay pedidos disponibles en este momento.
+    </div>
     <div v-else class="orders-grid">
       <div v-for="order in orders" :key="order.id" class="order-card">
         <div class="order-header">
-          <h3>Pedido #{{ order.id }}</h3>
-          <span :class="'status-' + order.estado">
+          <span class="order-id">#{{ order.id }}</span>
+          <span class="order-status" :class="order.estado">
             {{ formatStatus(order.estado) }}
           </span>
         </div>
-        
-        <div class="order-details">
-          <p><strong>Cliente:</strong> {{ order.usuario?.nombre || 'Cliente' }}</p>
-          <p><strong>Dirección:</strong> {{ order.direccionEntrega || 'Sin dirección' }}</p>
-          <p><strong>Total:</strong> ${{ Number(order.precioTotal || 0).toFixed(2) }}</p>
-        </div>
 
-        <div class="order-items" v-if="order.items && order.items.length > 0">
-          <h4>Productos:</h4>
-          <div v-for="item in order.items" :key="item.id" class="order-item">
-            <span class="item-quantity">{{ item.cantidad }}x</span>
-            <span class="item-name">{{ item.producto?.nombre || 'Producto' }}</span>
+        <div class="order-details">
+          <div class="order-customer">
+            <span class="material-icons">person</span>
+            <div>
+              <h4>Cliente: {{ order.usuario?.nombre || 'Cliente' }}</h4>
+              <p>ID: #{{ order.idUsuario || 'N/A' }}</p>
+            </div>
+          </div>
+
+          <div class="restaurant-info" v-if="order.restaurante && order.restaurante.nombre">
+            <span class="material-icons">store</span>
+            <div>
+              <h4>{{ order.restaurante.nombre }}</h4>
+              <p>{{ order.restaurante.direccion || 'Dirección no disponible' }}</p>
+            </div>
+          </div>
+          <div class="restaurant-info" v-else>
+            <span class="material-icons">store</span>
+            <div>
+              <h4>Restaurante no disponible</h4>
+              <p>No se pudo cargar la información del restaurante</p>
+            </div>
+          </div>
+
+          <div class="order-total">
+            <strong>Total del pedido:</strong>
+            <span>${{ typeof order.precioTotal === 'number' ? order.precioTotal.toFixed(2) : '0.00' }}</span>
+          </div>
+
+          <div class="order-actions">
+            <button 
+              v-if="order.estado === 'pendiente'" 
+              @click="updateOrderStatus(order.id, 'en_camino')"
+              :disabled="updatingOrderId === order.id"
+              class="btn-accept"
+            >
+              <span v-if="updatingOrderId !== order.id">Aceptar pedido</span>
+              <span v-else>Aceptando...</span>
+            </button>
+            
+            <button 
+              v-if="order.estado === 'en_camino'" 
+              @click="updateOrderStatus(order.id, 'entregada')"
+              :disabled="updatingOrderId === order.id"
+              class="btn-delivered"
+            >
+              <span v-if="updatingOrderId !== order.id">Marcar como entregado</span>
+              <span v-else>Actualizando...</span>
+            </button>
           </div>
         </div>
+      </div>
+    </div>
 
-        <div class="order-actions">
-          <button 
-            v-if="order.estado === 'pendiente'" 
-            @click="updateOrderStatus(order.id, 'en_camino')"
-            class="btn-accept"
-          >
-            Aceptar Pedido
-          </button>
-
-          <button 
-            v-else-if="order.estado === 'en_camino'" 
-            @click="updateOrderStatus(order.id, 'entregada')"
-            class="btn-deliver"
-          >
-            Marcar como Entregado
-          </button>
+    <div v-if="showVehiclesModal" class="modal-overlay" @click.self="showVehiclesModal = false">
+      <div class="modal-content">
+        <button class="close-modal" @click="showVehiclesModal = false">&times;</button>
+        <h3>Mis Vehículos Registrados</h3>
+        <div v-if="vehiclesLoading" class="loading">Cargando vehículos...</div>
+        <div v-else-if="vehiclesError" class="error">{{ vehiclesError }}</div>
+        <div v-else-if="!driverVehicles" class="no-vehicles">
+          No tienes vehículos registrados.
+        </div>
+        <div v-else class="vehicle-details">
+          <div class="vehicle-info">
+            <p><strong>Tipo:</strong> {{ driverVehicles.tipoVehiculo || 'No especificado' }}</p>
+            <p><strong>Marca:</strong> {{ driverVehicles.marca || 'No especificada' }}</p>
+            <p><strong>Modelo:</strong> {{ driverVehicles.modelo || 'No especificado' }}</p>
+            <p><strong>Color:</strong> {{ driverVehicles.color || 'No especificado' }}</p>
+            <p><strong>Año:</strong> {{ driverVehicles.anio || 'No especificado' }}</p>
+            <p><strong>Placa:</strong> {{ driverVehicles.placa || 'No especificada' }}</p>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </template>
 
-<script>
-import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { defineStore } from 'pinia'
-import axios from 'axios'
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useAuthStore } from '@/stores/auth';
+import axios from 'axios';
+import VehicleForm from '@/components/VehicleForm.vue';
 
-const API_URL = 'http://localhost:3000'
+const showVehicleForm = ref(false);
+const showVehiclesModal = ref(false);
+const driverVehicles = ref(null);
+const vehiclesLoading = ref(false);
+const vehiclesError = ref(null);
 
-// Definir el store de autenticación
-export const useAuthStore = defineStore('auth', () => {
-  const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
-  const token = ref(localStorage.getItem('token'))
-  const isAuthenticated = computed(() => !!token.value)
-  const userId = computed(() => user.value?.id || null)
+const fetchDriverVehicles = async () => {
+  try {
+    vehiclesLoading.value = true;
+    vehiclesError.value = null;
+    showVehiclesModal.value = true;
+    
+    const userId = authStore.user?.id;
+    if (!userId) {
+      throw new Error('Usuario no autenticado');
+    }
 
-  return {
-    user,
-    token,
-    isAuthenticated,
-    userId
+    const response = await axios.get(`${API_URL}/drivers/user/${userId}/vehicles`, {
+      headers: {
+        'Authorization': `Bearer ${authStore.token}`
+      }
+    });
+
+    driverVehicles.value = response.data;
+  } catch (error) {
+    console.error('Error al obtener vehículos:', error);
+    vehiclesError.value = 'No se pudieron cargar los vehículos. Intente de nuevo.';
+  } finally {
+    vehiclesLoading.value = false;
   }
-})
+};
 
-export default {
-  setup() {
-    const orders = ref([])
-    const loading = ref(true)
-    const router = useRouter()
-    const authStore = useAuthStore()
-    const driverId = ref(null)
+const handleVehicleSaved = (vehicleData) => {
+  showVehicleForm.value = false;
+  alert('Vehículo registrado exitosamente');
+};
 
-    // Formatear el estado para mostrar
-    const formatStatus = (status) => {
-      const statusMap = {
-        'pendiente': 'Pendiente',
-        'en_preparacion': 'En preparación',
-        'en_camino': 'En camino',
-        'entregada': 'Entregada',
-        'cancelada': 'Cancelada'
-      }
-      return statusMap[status] || status
-    }
+const API_URL = 'http://localhost:3000';
+const authStore = useAuthStore();
+const orders = ref([]);
+const loading = ref(true);
+const error = ref(null);
+const updatingOrderId = ref(null);
 
-    // Obtener pedidos
-    const fetchOrders = async () => {
-      try {
-        loading.value = true
-        console.log('Obteniendo pedidos...')
-        
-        // Verificar si hay un usuario autenticado
-        if (!authStore.isAuthenticated) {
-          console.error('Usuario no autenticado')
-          router.push('/login')
-          return
-        }
-        
-        driverId.value = authStore.userId
-        console.log('ID del repartidor:', driverId.value)
+const formatStatus = (status) => {
+  const statusMap = {
+    'pendiente': 'Pendiente',
+    'en_camino': 'En camino',
+    'entregada': 'Entregada',
+    'cancelada': 'Cancelada'
+  };
+  return statusMap[status] || status;
+};
 
-        // Obtener pedidos pendientes (sin repartidor asignado) y en camino
-        const [pendingResponse, inProgressResponse] = await Promise.all([
-          axios.get(`${API_URL}/orders?estado=pendiente&_expand=usuario&_expand=items`),
-          axios.get(`${API_URL}/orders?estado=en_camino&repartidorId=${driverId.value}&_expand=usuario&_expand=items`)
-        ])
-        
-        // Combinar y eliminar duplicados
-        const allOrders = [...pendingResponse.data, ...inProgressResponse.data]
-        orders.value = allOrders.filter((order, index, self) => 
-          index === self.findIndex(o => o.id === order.id)
-        )
-        
-        console.log('Pedidos cargados:', orders.value)
-      } catch (error) {
-        console.error('Error al cargar pedidos:', error)
-        alert('No se pudieron cargar los pedidos. Intenta de nuevo más tarde.')
-      } finally {
-        loading.value = false
-      }
-    }
+const fetchOrders = async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+    
+    const restaurantsResponse = await axios.get(`${API_URL}/restaurants`);
+    const restaurants = restaurantsResponse.data;
+    
+    const ordersResponse = await axios.get(`${API_URL}/orders?_embed=orderItems&_expand=usuario`);
+    
+    const defaultRestaurant = restaurants.length > 0 ? restaurants[0] : null;
+    
+    const ordersWithDetails = ordersResponse.data.map(order => {
+      const restaurante = defaultRestaurant || {};
+      
+      const precioTotal = typeof order.precioTotal === 'string' 
+        ? parseFloat(order.precioTotal) 
+        : order.precioTotal || 0;
 
-    // Actualizar estado del pedido
-    const updateOrderStatus = async (orderId, newStatus) => {
-      try {
-        const updateData = { 
-          estado: newStatus,
-          // Si se está aceptando el pedido, asignar al conductor actual
-          ...(newStatus === 'en_camino' && { repartidorId: driverId.value })
-        }
-        
-        console.log('Actualizando pedido:', { orderId, ...updateData })
-        await axios.patch(`${API_URL}/orders/${orderId}`, updateData)
-        
-        // Actualizar la lista de pedidos
-        await fetchOrders()
-        
-      } catch (error) {
-        console.error('Error al actualizar el pedido:', {
-          error: error.message,
-          response: error.response?.data,
-          status: error.response?.status
-        })
-        alert('No se pudo actualizar el pedido. Intenta de nuevo.')
-      }
-    }
+      return {
+        ...order,
+        precioTotal,
+        restaurante,
+        usuario: order.usuario || { nombre: 'Cliente' }
+      };
+    });
 
-    // Cargar pedidos al montar el componente
-    onMounted(fetchOrders)
-
-    return {
-      orders,
-      loading,
-      formatStatus,
-      updateOrderStatus
-    }
+    orders.value = ordersWithDetails.filter(order => 
+      order.estado === 'pendiente' || 
+      (order.estado === 'en_camino' && order.repartidorId === authStore.userId)
+    );
+    
+  } catch (err) {
+    console.error('Error al cargar pedidos:', err);
+    error.value = 'Error al cargar los pedidos. Por favor, intente de nuevo.';
+  } finally {
+    loading.value = false;
   }
-}
+};
+
+const updateOrderStatus = async (orderId, newStatus) => {
+  try {
+    updatingOrderId.value = orderId;
+    
+    const updateData = { estado: newStatus };
+    
+    if (newStatus === 'en_camino') {
+      updateData.repartidorId = authStore.userId;
+    }
+    
+    await axios.patch(`${API_URL}/orders/${orderId}`, updateData);
+    
+    const orderIndex = orders.value.findIndex(o => o.id === orderId);
+    if (orderIndex !== -1) {
+      orders.value[orderIndex].estado = newStatus;
+      if (newStatus === 'en_camino') {
+        orders.value[orderIndex].repartidorId = authStore.userId;
+      }
+    }
+    
+  } catch (err) {
+    console.error('Error al actualizar el pedido:', err);
+    error.value = 'Error al actualizar el pedido. Por favor, intente de nuevo.';
+  } finally {
+    updatingOrderId.value = null;
+  }
+};
+
+onMounted(() => {
+  if (authStore.isAuthenticated) {
+    fetchOrders();
+  }
+});
 </script>
 
 <style scoped>
-.delivery-orders {
+.home-delivery {
+  padding: 1.5rem;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
+}
+
+.header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.btn-register-vehicle {
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.btn-register-vehicle:hover {
+  background-color: #4338ca;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-view-vehicles {
+  background-color: #4a6cf7;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.btn-view-vehicles:hover {
+  background-color: #3a5bd9;
+}
+
+.vehicle-details {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.vehicle-info p {
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.no-vehicles {
+  text-align: center;
+  padding: 1.5rem;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.close-modal {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.25rem;
+  line-height: 1;
+}
+
+.close-modal:hover {
+  color: #4b5563;
 }
 
 .orders-grid {
@@ -188,109 +384,165 @@ export default {
 .order-card {
   background: white;
   border-radius: 8px;
-  padding: 15px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
 }
 
 .order-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eee;
+  padding: 12px 16px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.order-id {
+  font-weight: bold;
+  color: #555;
+}
+
+.order-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.order-status.pendiente {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.order-status.en_camino {
+  background-color: #cce5ff;
+  color: #004085;
+}
+
+.order-status.entregada {
+  background-color: #d4edda;
+  color: #155724;
 }
 
 .order-details {
-  margin: 15px 0;
+  padding: 16px;
 }
 
-.order-details p {
-  margin: 5px 0;
-}
-
-.order-items {
-  margin: 15px 0;
-  padding: 10px;
-  background: #f8f9fa;
-  border-radius: 4px;
-}
-
-.order-item {
+.order-customer,
+.restaurant-info {
   display: flex;
-  margin: 5px 0;
-  padding: 5px 0;
-  border-bottom: 1px solid #eee;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
 }
 
-.item-quantity {
+.order-customer .material-icons,
+.restaurant-info .material-icons {
+  margin-right: 12px;
+  font-size: 24px;
+  color: #4a6cf7;
+}
+
+.order-customer h4,
+.restaurant-info h4 {
+  margin: 0 0 4px;
+  color: #212529;
+}
+
+.order-customer p,
+.restaurant-info p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.order-total {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-top: 1px solid #e9ecef;
+  margin-top: 16px;
+  font-size: 1.1em;
+}
+
+.order-total strong {
+  color: #212529;
+}
+
+.order-total span {
   font-weight: bold;
-  margin-right: 10px;
-  min-width: 30px;
+  color: #28a745;
 }
 
 .order-actions {
+  margin-top: 16px;
   display: flex;
   gap: 10px;
-  margin-top: 15px;
 }
 
 button {
-  padding: 8px 15px;
+  flex: 1;
+  padding: 10px;
   border: none;
   border-radius: 4px;
-  cursor: pointer;
   font-weight: 500;
+  cursor: pointer;
   transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .btn-accept {
+  background-color: #4a6cf7;
+  color: white;
+}
+
+.btn-accept:hover:not(:disabled) {
+  background-color: #3a5bd9;
+}
+
+.btn-delivered {
   background-color: #28a745;
   color: white;
 }
 
-.btn-accept:hover {
+.btn-delivered:hover:not(:disabled) {
   background-color: #218838;
 }
 
-.btn-deliver {
-  background-color: #007bff;
-  color: white;
-}
-
-.btn-deliver:hover {
-  background-color: #0069d9;
-}
-
-.status-pendiente {
-  color: #ffc107;
-  font-weight: bold;
-}
-
-.status-en_preparacion {
-  color: #fd7e14;
-  font-weight: bold;
-}
-
-.status-en_camino {
-  color: #17a2b8;
-  font-weight: bold;
-}
-
-.status-entregada {
-  color: #28a745;
-  font-weight: bold;
-}
-
-.status-cancelada {
-  color: #dc3545;
-  font-weight: bold;
-}
-
-.loading, .no-orders {
+.loading,
+.error,
+.no-orders {
   text-align: center;
   padding: 40px;
-  font-size: 1.2em;
-  color: #666;
+  font-size: 1.1em;
+  color: #6c757d;
+}
+
+.error {
+  color: #dc3545;
+}
+
+@media (max-width: 768px) {
+  .orders-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .order-actions {
+    flex-direction: column;
+  }
+  
+  button {
+    width: 100%;
+  }
 }
 </style>

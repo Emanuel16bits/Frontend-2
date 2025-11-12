@@ -2,7 +2,7 @@
   <div class="seller-orders-container">
     <header class="seller-header">
       <div class="header-info">
-        <h1>🍔 Panel del Vendedor</h1>
+        <h1>Panel del Vendedor</h1>
         <p>{{ restaurantName }}</p>
       </div>
       <button class="btn btn-logout" @click="goTo('/home')">
@@ -11,7 +11,6 @@
     </header>
 
     <main class="seller-main">
-      <!-- Estadísticas rápidas -->
       <div class="stats-grid">
         <div class="stat-card pending">
           <div class="stat-icon">⏳</div>
@@ -43,7 +42,6 @@
         </div>
       </div>
 
-      <!-- Tabs de navegación -->
       <div class="tabs">
         <button 
           v-for="tab in tabs" 
@@ -56,7 +54,6 @@
         </button>
       </div>
 
-      <!-- Listado de pedidos -->
       <div v-if="loading" class="loading">
         <p>Cargando pedidos...</p>
       </div>
@@ -76,7 +73,6 @@
           class="seller-order-card"
           :class="`priority-${order.prioridad || 'normal'}`"
         >
-          <!-- Header del pedido -->
           <div class="seller-order-header">
             <div class="order-number">
               <h3>Pedido #{{ order.id }}</h3>
@@ -87,7 +83,6 @@
             </span>
           </div>
 
-          <!-- Info del cliente -->
           <div class="customer-info">
             <i class="fa-solid fa-user"></i>
             <div>
@@ -96,7 +91,6 @@
             </div>
           </div>
 
-          <!-- Items del pedido -->
           <div class="order-items">
             <h4>Productos:</h4>
             <ul>
@@ -104,32 +98,29 @@
                 <span class="item-qty">{{ item.cantidad }}x</span>
                 <span class="item-name">{{ item.nombre }}</span>
                 <span v-if="item.notas" class="item-notes">
-                  📝 {{ item.notas }}
+                  {{ item.notas }}
                 </span>
               </li>
             </ul>
           </div>
 
-          <!-- Dirección de entrega -->
           <div class="delivery-info">
             <i class="fa-solid fa-location-dot"></i>
             <span>{{ order.direccion }}</span>
           </div>
 
-          <!-- Total del pedido -->
           <div class="order-total">
             <strong>Total:</strong>
             <span class="total-amount">${{ order.total }}</span>
           </div>
 
-          <!-- Acciones según estado -->
           <div class="seller-order-actions">
             <button 
               v-if="order.estado === 'pendiente'"
               class="btn btn-accept"
               @click="acceptOrder(order.id)"
             >
-              ✅ Aceptar
+              Aceptar
             </button>
             
             <button 
@@ -137,7 +128,7 @@
               class="btn btn-reject"
               @click="rejectOrder(order.id)"
             >
-              ❌ Rechazar
+              Rechazar
             </button>
 
             <button 
@@ -145,14 +136,14 @@
               class="btn btn-ready"
               @click="markAsReady(order.id)"
             >
-              🍕 Marcar listo
+              Listo
             </button>
 
             <button 
               v-if="order.estado === 'listo'"
               class="btn btn-info"
             >
-              ⏳ Esperando repartidor
+              Esperando repartidor
             </button>
 
             <button 
@@ -163,7 +154,6 @@
             </button>
           </div>
 
-          <!-- Tiempo de preparación estimado -->
           <div v-if="order.estado === 'preparando'" class="prep-time">
             <i class="fa-regular fa-clock"></i>
             Tiempo estimado: {{ order.tiempoEstimado || 30 }} min
@@ -172,7 +162,6 @@
       </div>
     </main>
 
-    <!-- Botón flotante para gestionar productos -->
     <button class="fab" @click="goTo('/mis-productos')">
       <i class="fa-solid fa-boxes-stacked"></i>
     </button>
@@ -182,6 +171,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import axios from 'axios'
 import { getOrdersByDriver } from '@/services/orderService'
 
 const router = useRouter()
@@ -224,61 +214,44 @@ const filteredOrders = computed(() => {
   return orders.value.filter(o => o.estado === activeTab.value)
 })
 
+const API_URL = 'http://localhost:3000'
+
 const fetchOrders = async () => {
   loading.value = true
   error.value = null
   
   try {
-    // Datos de ejemplo - reemplazar con llamada real a API
-    orders.value = [
-      {
-        id: 101,
-        clienteNombre: 'Juan Pérez',
-        clienteTelefono: '351-123-4567',
-        fecha: new Date(),
-        estado: 'pendiente',
-        prioridad: 'alta',
-        total: 2500,
-        direccion: 'Av. Colón 1234',
-        items: [
-          { id: 1, nombre: 'Pizza Muzzarella Grande', cantidad: 2, notas: 'Sin aceitunas' },
-          { id: 2, nombre: 'Coca Cola 1.5L', cantidad: 1 }
-        ],
-        tiempoEstimado: 30
-      },
-      {
-        id: 102,
-        clienteNombre: 'María García',
-        clienteTelefono: '351-987-6543',
-        fecha: new Date(Date.now() - 600000),
-        estado: 'preparando',
-        prioridad: 'normal',
-        total: 1800,
-        direccion: 'San Martín 567',
-        items: [
-          { id: 3, nombre: 'Hamburguesa Completa', cantidad: 2 },
-          { id: 4, nombre: 'Papas fritas grandes', cantidad: 1 }
-        ],
-        tiempoEstimado: 20
-      },
-      {
-        id: 103,
-        clienteNombre: 'Carlos López',
-        clienteTelefono: '351-456-7890',
-        fecha: new Date(Date.now() - 1200000),
-        estado: 'listo',
-        prioridad: 'normal',
-        total: 3200,
-        direccion: 'Belgrano 890',
-        items: [
-          { id: 5, nombre: 'Milanesa napolitana', cantidad: 1 },
-          { id: 6, nombre: 'Ensalada mixta', cantidad: 1 }
-        ]
-      }
-    ]
+    const response = await axios.get(`${API_URL}/orders`)
+    
+    orders.value = response.data.map(order => ({
+      id: order.id,
+      clienteNombre: order.usuario ? `${order.usuario.nombre} ${order.usuario.apellido}` : 'Cliente',
+      clienteTelefono: order.usuario?.telefono || 'Sin teléfono',
+      fecha: new Date(order.fechaCreacion || new Date()),
+      estado: order.estado || 'pendiente',
+      prioridad: order.prioridad || 'normal',
+      total: order.total || 0,
+      direccion: order.direccion || 'Dirección no especificada',
+      items: order.items?.map(item => ({
+        id: item.id,
+        nombre: item.nombre || 'Producto sin nombre',
+        cantidad: item.cantidad || 1,
+        precio: item.precio || 0
+      })) || [],
+      tiempoEstimado: order.tiempoEstimado || 30
+    }))
+    
   } catch (err) {
     error.value = 'Error al cargar los pedidos'
     console.error('Error fetching orders:', err)
+    
+    if (err.response) {
+      console.error('Detalles del error:', err.response.data)
+      error.value = `Error ${err.response.status}: ${err.response.data?.message || 'Error al cargar los pedidos'}`
+    } else if (err.request) {
+      console.error('No se pudo conectar al servidor')
+      error.value = 'No se pudo conectar al servidor. Verifica que el backend esté en ejecución.'
+    }
   } finally {
     loading.value = false
   }
@@ -304,7 +277,6 @@ const acceptOrder = async (orderId) => {
     const order = orders.value.find(o => o.id === orderId)
     if (order) {
       order.estado = 'preparando'
-      // Llamar a API para actualizar estado
     }
   } catch (err) {
     alert('Error al aceptar el pedido')
@@ -318,7 +290,6 @@ const rejectOrder = async (orderId) => {
       const order = orders.value.find(o => o.id === orderId)
       if (order) {
         order.estado = 'cancelado'
-        // Llamar a API para actualizar estado
       }
     } catch (err) {
       alert('Error al rechazar el pedido')
@@ -331,7 +302,6 @@ const markAsReady = async (orderId) => {
     const order = orders.value.find(o => o.id === orderId)
     if (order) {
       order.estado = 'listo'
-      // Llamar a API para actualizar estado
     }
   } catch (err) {
     alert('Error al marcar como listo')
@@ -348,7 +318,6 @@ const goTo = (path) => {
 
 onMounted(() => {
   fetchOrders()
-  // Actualizar pedidos cada 30 segundos
   setInterval(fetchOrders, 30000)
 })
 </script>

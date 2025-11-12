@@ -8,7 +8,7 @@
         </div>
         <div class="user-section">
           <button class="btn-cart" @click="goTo('/carrito')">
-            🛒
+            <i class="fas fa-shopping-cart"></i>
             <span v-if="cartItemsCount > 0" class="cart-badge">{{ cartItemsCount }}</span>
           </button>
         </div>
@@ -16,7 +16,6 @@
     </header>
 
     <main class="client-main">
-      <!-- Botón de volver -->
      <button @click="goTo('/home-cliente')" class="back-button">
   <i class="fas fa-arrow-left"></i> Volver
 </button>
@@ -101,7 +100,6 @@ const goTo = (path) => {
   router.push(path);
 };
 
-// Obtener los pedidos del usuario
 const fetchOrders = async () => {
   try {
     loading.value = true;
@@ -109,7 +107,7 @@ const fetchOrders = async () => {
       withCredentials: true
     });
     
-    // Para cada orden, obtener sus items
+    
     const ordersWithItems = await Promise.all(
       ordersResponse.data.map(async (order) => {
         try {
@@ -138,24 +136,22 @@ const fetchOrders = async () => {
     
     orders.value = ordersWithItems;
   } catch (error) {
-    console.error('Error al cargar los pedidos:', {
+    console.error('Error al cargar los pedidos', {
       error: error.message,
       response: error.response?.data,
       status: error.response?.status
     });
-    alert('No se pudieron cargar los pedidos. Por favor, inténtalo de nuevo más tarde.');
+    alert('No se pudieron cargar los pedidos');
   } finally {
     loading.value = false;
   }
 };
 
-// Formatear precios
 const formatPrice = (price) => {
   const num = Number(price);
   return isNaN(num) ? '0.00' : num.toFixed(2);
 };
 
-// Formatear fecha
 const formatDate = (dateString) => {
   if (!dateString) return 'Fecha no disponible';
   const options = { 
@@ -168,7 +164,6 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('es-ES', options);
 };
 
-// Formatear estado
 const formatStatus = (status) => {
   if (!status) return 'Desconocido';
   const statusMap = {
@@ -187,13 +182,10 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Estilos base del contenedor */
 .client-home-container {
   min-height: 100vh;
   background: #f5f5f5;
 }
-
-/* Header */
 .client-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
@@ -218,7 +210,6 @@ onMounted(() => {
   font-weight: bold;
 }
 
-/* Botón de volver */
 .back-button {
   background: #667eea;
   color: white;
@@ -239,7 +230,6 @@ onMounted(() => {
   transform: translateY(-2px);
 }
 
-/* Contenedor de órdenes */
 .orders-container {
   max-width: 1400px;
   margin: 0 auto;
@@ -252,13 +242,10 @@ onMounted(() => {
   margin-bottom: 25px;
 }
 
-/* Lista de órdenes */
 .orders-list {
   display: grid;
   gap: 20px;
 }
-
-/* Tarjeta de orden */
 .order-card {
   background: white;
   border-radius: 15px;
@@ -392,7 +379,6 @@ onMounted(() => {
   gap: 8px;
 }
 
-/* Estados de carga y vacío */
 .loading-state,
 .empty-state {
   text-align: center;
@@ -436,7 +422,6 @@ onMounted(() => {
   box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .header-content {
     padding: 0 15px;

@@ -1,14 +1,11 @@
 <template>
   <div class="search-restaurants">
-    <!-- Header -->
     <header class="header">
       <div class="container">
-        <h1>🍕 Restaurantes</h1>
+        <h1>Restaurantes</h1>
         <button @click="goBack" class="btn-back">← Volver</button>
       </div>
     </header>
-
-    <!-- Search Bar -->
     <div class="search-section">
       <div class="container">
         <div class="search-box">
@@ -26,7 +23,6 @@
       </div>
     </div>
 
-    <!-- Categories Filter -->
     <div class="categories-section">
       <div class="container">
         <h2>Categorías</h2>
@@ -45,7 +41,6 @@
       </div>
     </div>
 
-    <!-- Results -->
     <div class="results-section">
       <div class="container">
         <div class="results-header">
@@ -58,26 +53,21 @@
           </button>
         </div>
 
-        <!-- Loading State -->
         <div v-if="loading" class="loading-state">
           <div class="spinner"></div>
           <p>Cargando restaurantes...</p>
         </div>
-
-        <!-- Error State -->
         <div v-else-if="error" class="error-state">
           <p>{{ error }}</p>
           <button @click="fetchRestaurants" class="btn-retry">Reintentar</button>
         </div>
 
-        <!-- Empty State -->
         <div v-else-if="filteredRestaurants.length === 0" class="empty-state">
           <div class="empty-icon">🔍</div>
           <h3>No encontramos resultados</h3>
           <p>Intenta con otra búsqueda</p>
         </div>
 
-        <!-- Restaurants Grid -->
         <div v-else class="restaurants-grid">
           <div
             v-for="restaurant in filteredRestaurants"
@@ -133,7 +123,6 @@ const restaurantsStore = useRestaurantsStore()
 const searchQuery = ref('')
 const selectedCategory = ref(null)
 
-// Computed
 const restaurants = computed(() => restaurantsStore.restaurants)
 const categories = computed(() => restaurantsStore.categories)
 const loading = computed(() => restaurantsStore.loading)
@@ -142,12 +131,9 @@ const error = computed(() => restaurantsStore.error)
 const filteredRestaurants = computed(() => {
   let result = restaurants.value
 
-  // Filter by category
   if (selectedCategory.value) {
     result = result.filter(r => r.categoryId === selectedCategory.value)
   }
-
-  // Filter by search query
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(
@@ -161,9 +147,7 @@ const filteredRestaurants = computed(() => {
   return result
 })
 
-// Methods
 const handleSearch = () => {
-  // Búsqueda en tiempo real ya se maneja con el computed
 }
 
 const toggleCategory = (categoryId) => {
@@ -194,8 +178,6 @@ const goBack = () => {
 const fetchRestaurants = async () => {
   await restaurantsStore.fetchRestaurants()
 }
-
-// Lifecycle
 onMounted(async () => {
   if (restaurants.value.length === 0) {
     await fetchRestaurants()

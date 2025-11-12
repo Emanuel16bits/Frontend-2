@@ -1,6 +1,5 @@
 <template>
   <div class="restaurant-detail">
-    <!-- Encabezado del restaurante -->
     <div class="restaurant-header">
       <img :src="restaurant.image" :alt="restaurant.nombre" class="restaurant-cover">
       <div class="header-overlay">
@@ -19,7 +18,6 @@
       </div>
     </div>
 
-    <!-- Información del restaurante -->
     <div class="restaurant-info">
       <div class="info-section">
         <h2><i class="fas fa-info-circle"></i> Información</h2>
@@ -53,7 +51,6 @@
         </div>
       </div>
 
-      <!-- Menú del restaurante -->
       <div class="menu-section">
         <h2><i class="fas fa-utensils"></i> Menú</h2>
         
@@ -125,7 +122,6 @@ const restaurant = ref({
 const menuCategories = ref([])
 const loadingMenu = ref(true)
 
-// Verificar si el restaurante está abierto según la hora actual
 const isOpen = computed(() => {
   try {
     if (!restaurant.value.horarioApertura || !restaurant.value.horarioCierre) return false
@@ -147,13 +143,11 @@ const isOpen = computed(() => {
   }
 })
 
-// Mostrar notificación
 const showNotification = (message, type = 'success') => {
   const notification = document.createElement('div')
   notification.className = `native-notification ${type}`
   notification.textContent = message
   
-  // Estilos para la notificación
   Object.assign(notification.style, {
     position: 'fixed',
     bottom: '20px',
@@ -170,7 +164,6 @@ const showNotification = (message, type = 'success') => {
     textAlign: 'center'
   })
   
-  // Agregar estilos para las animaciones si no existen
   if (!document.getElementById('notification-styles')) {
     const style = document.createElement('style')
     style.id = 'notification-styles'
@@ -190,10 +183,8 @@ const showNotification = (message, type = 'success') => {
     document.head.appendChild(style)
   }
   
-  // Agregar la notificación al body
   document.body.appendChild(notification)
   
-  // La quitamos después de 3 segundos
   setTimeout(() => {
     notification.style.animation = 'fadeOut 0.3s ease-out'
     setTimeout(() => {
@@ -204,16 +195,14 @@ const showNotification = (message, type = 'success') => {
   }, 3000)
 }
 
-// Formatear hora (HH:MM:SS a HH:MM)
 const formatTime = (timeString) => {
   if (!timeString) return ''
   return timeString.slice(0, 5)
 }
 
-// Agregar al carrito
 const addToCart = (item) => {
   if (!isOpen.value) {
-    showNotification('Lo sentimos, el restaurante está cerrado en este momento', 'error')
+    showNotification('El restaurante está cerrado en este momento', 'error')
     return
   }
 
@@ -229,43 +218,39 @@ const addToCart = (item) => {
       quantity: 1,
       restaurantId: route.params.id,
       restaurantName: restaurant.value.nombre,
-      imagen: item.imagen,  // Asegúrate de incluir la imagen
+      imagen: item.imagen,
       descripcion: item.descripcion
     })
     
     showNotification(`${item.nombre} agregado al carrito`, 'success')
   } catch (error) {
-    console.error('Error al agregar al carrito:', error)
+    console.error('Error al agregar al carrito', error)
     showNotification('Error al agregar al carrito', 'error')
   }
 }
 
-// Obtener información del restaurante
 const fetchRestaurant = async () => {
   try {
     const res = await axios.get(`http://localhost:3000/restaurants/${route.params.id}`)
     restaurant.value = { ...restaurant.value, ...res.data }
   } catch (error) {
-    console.error('Error al cargar el restaurante:', error)
-    showNotification('No se pudo cargar la información del restaurante', 'error')
+    console.error('Error al cargar el restaurante', error)
+    showNotification('No se pudo cargar la informacion del restaurante', 'error')
   }
 }
 
-// Obtener menú del restaurante
 const fetchMenu = async () => {
   try {
     loadingMenu.value = true
     
-    console.log('ID del restaurante en la URL:', route.params.id)
+    console.log('id del restaurante en la URL', route.params.id)
     
-    // Obtener todos los productos
     const response = await axios.get('http://localhost:3000/products')
-    console.log('Todos los productos:', response.data)
+    console.log('Todos los productos', response.data)
     
-    // Filtrar productos que pertenecen a este restaurante
     const restaurantProducts = response.data || []
     
-    console.log('Productos del restaurante:', restaurantProducts)
+    console.log('Productos del restaurante', restaurantProducts)
     
     if (restaurantProducts.length === 0) {
       console.log('No hay productos para este restaurante')
@@ -273,7 +258,6 @@ const fetchMenu = async () => {
       return
     }
     
-    // Crear una categoría por defecto
     menuCategories.value = [{
       id: 'default-category',
       nombre: 'Menú',
@@ -286,17 +270,16 @@ const fetchMenu = async () => {
       }))
     }]
     
-    console.log('Menú organizado:', menuCategories.value)
+    console.log('Menu organizado', menuCategories.value)
     
   } catch (error) {
-    console.error('Error al cargar el menú:', error)
-    showNotification('No se pudo cargar el menú del restaurante', 'error')
+    console.error('Error al cargar el menu', error)
+    showNotification('No se pudo cargar el menu del restaurante', 'error')
   } finally {
     loadingMenu.value = false
   }
 }
 
-// Cargar datos al montar el componente
 onMounted(async () => {
   await fetchRestaurant()
   await fetchMenu()
@@ -311,7 +294,6 @@ onMounted(async () => {
   position: relative;
 }
 
-/* Estilos del encabezado */
 .restaurant-header {
   position: relative;
   border-radius: 12px;
@@ -382,7 +364,6 @@ onMounted(async () => {
   color: white;
 }
 
-/* Estilos de la sección de información */
 .restaurant-info {
   display: grid;
   grid-template-columns: 1fr;
@@ -437,7 +418,6 @@ onMounted(async () => {
   font-size: 0.9rem;
 }
 
-/* Estilos del menú */
 .menu-category {
   margin-bottom: 32px;
 }
@@ -513,7 +493,6 @@ onMounted(async () => {
   color: #2c3e50;
 }
 
-/* Botón de agregar al carrito */
 .add-to-cart {
   background-color: #4CAF50;
   color: white;
@@ -540,7 +519,6 @@ onMounted(async () => {
   opacity: 0.7;
 }
 
-/* Mensajes de carga y vacío */
 .loading-message,
 .empty-menu {
   text-align: center;
@@ -554,7 +532,6 @@ onMounted(async () => {
   font-size: 1.1rem;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .info-grid {
     grid-template-columns: 1fr;

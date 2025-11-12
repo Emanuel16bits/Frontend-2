@@ -19,7 +19,6 @@
     </header>
 
     <main class="driver-main">
-      <!-- Estadísticas del día -->
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-icon">📦</div>
@@ -51,7 +50,6 @@
         </div>
       </div>
 
-      <!-- Pestañas de estado -->
       <div class="tabs">
         <button 
           v-for="tab in tabs" 
@@ -64,7 +62,6 @@
         </button>
       </div>
 
-      <!-- Alerta de estado offline -->
       <div v-if="!isOnline" class="offline-alert">
         <i class="fa-solid fa-circle-exclamation"></i>
         <p>Estás en modo "No disponible". No recibirás nuevos pedidos.</p>
@@ -73,7 +70,6 @@
         </button>
       </div>
 
-      <!-- Lista de pedidos -->
       <div v-if="loading" class="loading">
         <p>Cargando pedidos...</p>
       </div>
@@ -89,7 +85,6 @@
           class="delivery-card"
           :class="delivery.estado"
         >
-          <!-- Header -->
           <div class="delivery-header">
             <div class="delivery-number">
               <h3>Pedido #{{ delivery.id }}</h3>
@@ -100,7 +95,6 @@
             </span>
           </div>
 
-          <!-- Información del restaurante -->
           <div class="location-section pickup">
             <div class="location-icon">🏪</div>
             <div class="location-info">
@@ -110,7 +104,6 @@
             </div>
           </div>
 
-          <!-- Información del cliente -->
           <div class="location-section delivery-loc">
             <div class="location-icon">📍</div>
             <div class="location-info">
@@ -121,7 +114,6 @@
             </div>
           </div>
 
-          <!-- Distancia y pago -->
           <div class="delivery-details">
             <div class="detail-item">
               <i class="fa-solid fa-route"></i>
@@ -137,36 +129,30 @@
             </div>
           </div>
 
-          <!-- Total a cobrar (si es en efectivo) -->
           <div v-if="delivery.metodoPago === 'efectivo'" class="cash-collect">
             <strong>💰 A cobrar:</strong>
             <span class="amount">${{ delivery.total }}</span>
           </div>
-
-          <!-- Notas especiales -->
           <div v-if="delivery.notas" class="delivery-notes">
             <i class="fa-solid fa-note-sticky"></i>
             <span>{{ delivery.notas }}</span>
           </div>
 
-          <!-- Acciones según estado -->
           <div class="delivery-actions">
-            <!-- Pedido disponible -->
             <button 
               v-if="delivery.estado === 'disponible'"
               class="btn btn-accept-delivery"
               @click="acceptDelivery(delivery.id)"
             >
-              ✅ Aceptar entrega
+              Aceptar entrega
             </button>
 
-            <!-- Pedido asignado -->
             <template v-if="delivery.estado === 'asignado'">
               <button 
                 class="btn btn-primary"
                 @click="startPickup(delivery.id)"
               >
-                🏪 Ir a recoger
+                Ir a recoger
               </button>
               <button 
                 class="btn btn-secondary"
@@ -176,45 +162,42 @@
               </button>
             </template>
 
-            <!-- En camino al restaurante -->
             <template v-if="delivery.estado === 'recogiendo'">
               <button 
                 class="btn btn-success"
                 @click="confirmPickup(delivery.id)"
               >
-                ✅ Pedido recogido
+                Pedido recogido
               </button>
               <button 
                 class="btn btn-map"
                 @click="openMap(delivery.restauranteDireccion)"
               >
-                🗺️ Ver mapa
+                Ver mapa
               </button>
             </template>
 
-            <!-- En camino al cliente -->
             <template v-if="delivery.estado === 'en_camino'">
               <button 
                 class="btn btn-success"
                 @click="confirmDelivery(delivery.id)"
               >
-                ✅ Entregado
+                Entregado
               </button>
               <button 
                 class="btn btn-map"
                 @click="openMap(delivery.direccionEntrega)"
               >
-                🗺️ Ver mapa
+                Ver mapa
               </button>
               <button 
                 class="btn btn-call"
                 @click="callClient(delivery.clienteTelefono)"
               >
-                📞 Llamar
+                Llamar
               </button>
             </template>
 
-            <!-- Botón de ver detalles (siempre) -->
             <button 
               class="btn btn-details"
               @click="viewDeliveryDetails(delivery.id)"
@@ -223,7 +206,6 @@
             </button>
           </div>
 
-          <!-- Timer para entregas en curso -->
           <div v-if="['recogiendo', 'en_camino'].includes(delivery.estado)" class="delivery-timer">
             <i class="fa-regular fa-clock"></i>
             Tiempo transcurrido: {{ getElapsedTime(delivery.inicioEntrega) }}
@@ -232,7 +214,6 @@
       </div>
     </main>
 
-    <!-- Botón flotante de historial -->
     <button class="fab" @click="goTo('/repartidor/historial')">
       <i class="fa-solid fa-clock-rotate-left"></i>
     </button>
@@ -240,8 +221,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import axios from 'axios'
 import { useDriverStore } from '@/stores/driverStore'
 
 const router = useRouter()
@@ -306,61 +288,43 @@ const filteredDeliveries = computed(() => {
   }
 })
 
+const API_URL = 'http://localhost:3000'
+
 const fetchDeliveries = async () => {
   loading.value = true
   
   try {
-    // Datos de ejemplo - reemplazar con API real
-    deliveries.value = [
-      {
-        id: 201,
-        fecha: new Date(),
-        estado: 'disponible',
-        restauranteNombre: 'Pizza Palace',
-        restauranteDireccion: 'Av. Colón 1234',
-        clienteNombre: 'María González',
-        clienteTelefono: '351-123-4567',
-        direccionEntrega: 'San Martín 567, Piso 3 Dpto B',
-        distancia: 2.5,
-        costoEnvio: 500,
-        total: 2500,
-        metodoPago: 'efectivo',
-        notas: 'Tocar timbre 3B'
-      },
-      {
-        id: 202,
-        fecha: new Date(Date.now() - 300000),
-        estado: 'asignado',
-        restauranteNombre: 'Burger King',
-        restauranteDireccion: 'Av. Vélez Sarsfield 200',
-        clienteNombre: 'Carlos Rodríguez',
-        clienteTelefono: '351-987-6543',
-        direccionEntrega: 'Belgrano 890',
-        distancia: 3.2,
-        costoEnvio: 600,
-        total: 1800,
-        metodoPago: 'tarjeta',
-        inicioEntrega: new Date(Date.now() - 300000)
-      },
-      {
-        id: 203,
-        fecha: new Date(Date.now() - 900000),
-        estado: 'en_camino',
-        restauranteNombre: 'Sushi House',
-        restauranteDireccion: 'Bv. San Juan 456',
-        clienteNombre: 'Ana Martínez',
-        clienteTelefono: '351-456-7890',
-        direccionEntrega: 'Av. Hipólito Yrigoyen 1200',
-        distancia: 4.0,
-        costoEnvio: 700,
-        total: 3200,
-        metodoPago: 'efectivo',
-        notas: 'Departamento con portero eléctrico',
-        inicioEntrega: new Date(Date.now() - 900000)
-      }
-    ]
+    const response = await axios.get(`${API_URL}/orders`)
+    
+    const pedidosEnCamino = response.data.filter(
+      pedido => pedido.estado === 'en_camino' || pedido.estado === 'asignado'
+    )
+    
+    deliveries.value = pedidosEnCamino.map(pedido => ({
+      id: pedido.id,
+      fecha: new Date(pedido.fecha || new Date()),
+      estado: pedido.estado,
+      restauranteNombre: pedido.restaurante?.nombre || 'Restaurante no especificado',
+      restauranteDireccion: pedido.restaurante?.direccion || 'Dirección no disponible',
+      clienteNombre: pedido.usuario ? `${pedido.usuario.nombre} ${pedido.usuario.apellido}` : 'Cliente',
+      clienteTelefono: pedido.usuario?.telefono || 'Sin teléfono',
+      direccionEntrega: pedido.direccion || 'Dirección no especificada',
+      distancia: 0,
+      costoEnvio: 500,
+      total: pedido.total || 0,
+      metodoPago: pedido.metodoPago || 'efectivo',
+      notas: pedido.notas || '',
+      inicioEntrega: pedido.estado === 'en_camino' ? new Date() : null
+    }))
+    
   } catch (err) {
-    console.error('Error fetching deliveries:', err)
+    console.error('Error al cargar los envíos:', err)
+    
+    if (err.response) {
+      console.error('Detalles del error:', err.response.data)
+    } else if (err.request) {
+      console.error('No se pudo conectar al servidor')
+    }
   } finally {
     loading.value = false
   }
@@ -368,7 +332,6 @@ const fetchDeliveries = async () => {
 
 const toggleStatus = () => {
   isOnline.value = !isOnline.value
-  // Actualizar estado en el servidor
   if (isOnline.value) {
     fetchDeliveries()
   }
@@ -376,11 +339,11 @@ const toggleStatus = () => {
 
 const getStatusLabel = (status) => {
   const labels = {
-    disponible: '🆕 Disponible',
-    asignado: '📋 Asignado',
-    recogiendo: '🏪 Recogiendo',
-    en_camino: '🛵 En camino',
-    entregado: '✅ Entregado'
+    disponible: 'Disponible',
+    asignado: 'Asignado',
+    recogiendo: 'Recogiendo',
+    en_camino: 'En camino',
+    entregado: 'Entregado'
   }
   return labels[status] || status
 }
@@ -448,12 +411,12 @@ const confirmPickup = async (deliveryId) => {
 }
 
 const confirmDelivery = async (deliveryId) => {
-  if (confirm('¿Confirmas que el pedido fue entregado?')) {
+  if (confirm('¿El pedido fue entregado?')) {
     try {
       const delivery = deliveries.value.find(d => d.id === deliveryId)
       if (delivery) {
         delivery.estado = 'entregado'
-        alert('¡Entrega completada! 🎉')
+        alert('Entrega completada')
         await fetchDeliveries()
       }
     } catch (err) {
@@ -463,7 +426,7 @@ const confirmDelivery = async (deliveryId) => {
 }
 
 const cancelDelivery = async (deliveryId) => {
-  const reason = prompt('Motivo de cancelación:')
+  const reason = prompt('Motivo de cancelación')
   if (reason) {
     try {
       const delivery = deliveries.value.find(d => d.id === deliveryId)
@@ -496,7 +459,6 @@ const goTo = (path) => {
 onMounted(() => {
   fetchDeliveries()
   
-  // Actualizar cada 30 segundos
   timerInterval = setInterval(() => {
     fetchDeliveries()
   }, 30000)

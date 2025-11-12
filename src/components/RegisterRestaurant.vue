@@ -1,8 +1,7 @@
 <template>
   <div class="register-container">
-    <h2>Registrar Nuevo Restaurante</h2>
-    <form @submit.prevent="handleCreate" class="register-form">
-      <!-- Sección de Datos del Restaurante -->
+    <h2>{{ isEditing ? 'Editar' : 'Registrar Nuevo' }} Restaurante</h2>
+    <form @submit.prevent="handleSubmit" class="register-form">
       <div class="form-section">
         <div class="form-group">
           <label for="nombreRestaurante">Nombre del Restaurante*</label>
@@ -16,7 +15,7 @@
         </div>
 
         <div class="form-group">
-          <label for="descripcion">Descripción</label>
+          <label for="descripcion">Descripcion</label>
           <textarea 
             id="descripcion" 
             v-model="restaurant.descripcion"
@@ -26,18 +25,18 @@
         </div>
 
         <div class="form-group">
-          <label for="direccion">Dirección*</label>
+          <label for="direccion">Direccion*</label>
           <input 
             type="text" 
             id="direccion" 
             v-model="restaurant.direccion"
             required
-            placeholder="Dirección del restaurante"
+            placeholder="Direccion del restaurante"
           >
         </div>
 
         <div class="form-group">
-          <label for="categoria">Categoría*</label>
+          <label for="categoria">Categoria*</label>
           <select 
             id="categoria" 
             v-model="restaurant.categoria"
@@ -78,26 +77,42 @@
         {{ message }}
       </div>
 
-     <button 
-  type="submit" 
-  :disabled="loading" 
-  class="submit-btn"
-  @click="handleCreate"
->
-  {{ loading ? 'Registrando...' : 'Registrar Restaurante' }}
-</button>
+      <div class="form-actions">
+        <button 
+          v-if="isEditing"
+          type="button" 
+          class="btn btn-danger"
+          @click="confirmDelete"
+          :disabled="loading"
+        >
+          Eliminar Restaurante
+        </button>
+        <button 
+          type="submit" 
+          class="btn btn-primary"
+          :disabled="loading"
+        >
+          {{ loading ? (isEditing ? 'Actualizando...' : 'Registrando...') : (isEditing ? 'Actualizar' : 'Registrar') }} Restaurante
+        </button>
+      </div>
     </form>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import axios from 'axios'
 
+const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const loading = ref(false)
+const message = ref('')
+const error = ref(false)
+
+const isEditing = computed(() => !!route.params.id)
 
 const restaurant = ref({
   nombre: '',
@@ -105,191 +120,273 @@ const restaurant = ref({
   direccion: '',
   categoria: '',
   horarioApertura: '08:00',
-  horarioCierre: '22:00',
-  activo: true
+  horarioCierre: '22:00'
 })
 
-const loading = ref(false)
-const message = ref('')
-const error = ref(false)
-
-    const handleCreate = async () => {
-  try {
-    loading.value = true;
-    message.value = '';
-    error.value = false;
-
-   
-    const userId = authStore.userId;
-    if (!userId) {
-      throw new Error('No se pudo obtener el ID del usuario');
-    }
-
-    const restaurantData = {
-      ...restaurant.value,
-      idUsuario: userId, 
-      activo: true
-    };
-
-    console.log('📤 Enviando datos del restaurante:', restaurantData);
-
-    const response = await axios.post('http://localhost:3000/restaurants', restaurantData);
-    
-    if (!response.data) {
-      throw new Error('No se recibió respuesta del servidor');
-    }
-
-    console.log('✅ Restaurante creado:', response.data);
-    message.value = 'Restaurante registrado con éxito';
-    error.value = false;
-
-   
-    if (authStore.restaurant) {
-      await authStore.updateRestaurant(authStore.restaurant.id, response.data);
-    } else {
-      
-      await authStore.refreshUser();
-    }
-
-    setTimeout(() => {
-      router.push('/home-vendedor');
-    }, 1500);
-
-  } catch (err) {
-    console.error('❌ Error al registrar restaurante:', err);
-    message.value = err.response?.data?.message || 'Error al registrar el restaurante. Por favor, inténtalo de nuevo.';
-    error.value = true;
-  } finally {
-    loading.value = false;
+onMounted(async () => {
+  if (isEditing.value) {
+    await loadRestaurant()
   }
-};  
+})
+
+const loadRestaurant = async () => {
+  try {
+    loading.value = true
+    const response = await axios.get(`http://localhost:3000/restaurants/${route.params.id}`)
+    if (response.data) {
+      restaurant.value = {
+        ...response.data,
+        horarioApertura: formatTimeForInput(response.data.horarioApertura),
+        horarioCierre: formatTimeForInput(response.data.horarioCierre)
+      }
+    }
+  } catch (err) {
+    console.error('Error al cargar el restaurante', err)
+    message.value = 'Error al cargar los datos del restaurante'
+    error.value = true
+  } finally {
+    loading.value = false
+  }
+}
+
+const formatTimeForInput = (timeString) => {
+  if (!timeString) return '08:00'
+  if (timeString.match(/^\d{2}:\d{2}$/)) return timeString
+  
+  if (timeString.hours !== undefined) {
+    return `${String(timeString.hours).padStart(2, '0')}:${String(timeString.minutes || '00').padStart(2, '0')}`
+  }
+  
+  const date = new Date(timeString)
+  if (!isNaN(date.getTime())) {
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  }
+  
+  return '08:00'
+}
+
+const handleSubmit = async () => {
+  try {
+    loading.value = true
+    message.value = ''
+    error.value = false
+
+    if (isEditing.value) {
+      await updateRestaurant()
+    } else {
+      await createRestaurant()
+    }
+  } catch (err) {
+    console.error('Error', err)
+    message.value = `Error al ${isEditing.value ? 'actualizar' : 'crear'} el restaurante. Intenta de nuevo.`
+    error.value = true
+  } finally {
+    loading.value = false
+  }
+}
+
+const createRestaurant = async () => {
+  const response = await axios.post('http://localhost:3000/restaurants', {
+    ...restaurant.value,
+    idUsuario: authStore.user.id
+  })
+  
+  if (response.data) {
+    message.value = 'Restaurante creado correctamente'
+    setTimeout(() => {
+      router.push('/home-vendedor')
+    }, 1500)
+  }
+}
+
+const updateRestaurant = async () => {
+  const response = await axios.put(
+    `http://localhost:3000/restaurants/${route.params.id}`,
+    restaurant.value
+  )
+  
+  if (response.data) {
+    message.value = 'Restaurante actualizado'
+    if (authStore.restaurant?.id === route.params.id) {
+      authStore.setRestaurant(response.data)
+    }
+    setTimeout(() => {
+      router.push('/home-vendedor')
+    }, 1500)
+  }
+}
+
+const confirmDelete = () => {
+  if (confirm('¿Quieres eliminar el restaurante?')) {
+    deleteRestaurant()
+  }
+}
+
+const deleteRestaurant = async () => {
+  try {
+    await axios.delete(`http://localhost:3000/restaurants/${route.params.id}`)
+    if (authStore.restaurant?.id === route.params.id) {
+      authStore.setRestaurant(null)
+    }
+    message.value = 'Restaurante eliminado correctamente'
+    setTimeout(() => {
+      router.push('/home-vendedor')
+    }, 1000)
+  } catch (err) {
+    console.error('Error al eliminar el restaurante', err)
+    message.value = 'Error al eliminar el restaurante, intenta de nuevo'
+    error.value = true
+  }
+}
 </script>
 
 <style scoped>
-
 .register-container {
   max-width: 800px;
   margin: 2rem auto;
   padding: 2rem;
   background: white;
   border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
 }
 
 h2 {
   text-align: center;
-  color: #333;
+  color: #2c3e50;
   margin-bottom: 2rem;
+}
+
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .form-section {
-  margin-bottom: 2rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid #eee;
-}
-
-h3 {
-  color: #444;
-  margin-bottom: 1.5rem;
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.2rem;
 }
 
-label {
+.form-group label {
   display: block;
   margin-bottom: 0.5rem;
-  color: #555;
   font-weight: 500;
+  color: #495057;
 }
 
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="time"],
-select,
-textarea {
+.form-group input[type="text"],
+.form-group input[type="time"],
+.form-group select,
+.form-group textarea {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
   font-size: 1rem;
-  transition: border-color 0.3s;
+  transition: border-color 0.2s;
 }
 
-input[type="text"]:focus,
-input[type="email"]:focus,
-input[type="password"]:focus,
-input[type="time"]:focus,
-select:focus,
-textarea:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+.form-group input[type="text"]:focus,
+.form-group input[type="time"]:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: #80bdff;
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
 .form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 1rem;
 }
 
-.submit-btn {
-  width: 100%;
+.form-row .form-group {
+  flex: 1;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+}
+
+.btn {
   padding: 0.75rem 1.5rem;
-  background-color: #667eea;
-  color: white;
   border: none;
-  border-radius: 0.375rem;
+  border-radius: 4px;
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
-  margin-top: 1rem;
+  transition: all 0.2s;
 }
 
-.submit-btn:hover {
-  background-color: #4338CA;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-.submit-btn:disabled {
-  background-color: #A5B4FC;
+.btn:disabled {
+  opacity: 0.7;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-  opacity: 0.8;
 }
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
 .message {
-  padding: 0.75rem;
-  margin-bottom: 1.5rem;
-  border-radius: 6px;
+  padding: 1rem;
+  border-radius: 4px;
+  margin: 1rem 0;
   text-align: center;
   font-weight: 500;
 }
 
-.message.success {
-  background-color: #D1FAE5;
-  color: #065F46;
-  border: 1px solid #A7F3D0;
+.message.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }
 
-.message.error {
-  background-color: #FEE2E2;
-  color: #B91C1C;
-  border: 1px solid #FCA5A5;
+.message.success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
 }
 
 @media (max-width: 768px) {
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-  
   .register-container {
     margin: 1rem;
-    padding: 1.5rem;
+    padding: 1rem;
+  }
+  
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .btn {
+    width: 100%;
   }
 }
 </style>

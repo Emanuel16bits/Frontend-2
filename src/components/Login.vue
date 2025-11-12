@@ -64,7 +64,7 @@ const message = ref('')
 
 const handleLogin = async () => {
   if (!loginData.value.email || !loginData.value.password) {
-    message.value = 'Por favor completa todos los campos'
+    message.value = 'Completa todos los campos'
     return
   }
 
@@ -73,7 +73,7 @@ const handleLogin = async () => {
     await authStore.login(loginData.value)
     router.push('/home')
   } catch (error) {
-    message.value = error.message || 'Error al iniciar sesión'
+    message.value = error.message || 'Error al iniciar sesion'
   } finally {
     loading.value = false
   }
@@ -81,6 +81,67 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f9fafb;
+  padding: 1rem;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: white;
+  border-radius: 0.75rem;
+  padding: 2.5rem 2rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.login-logo p {
+  color: #6b7280;
+  margin-top: 0.5rem;
+}
+
+.login-form {
+  margin-top: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  font-size: 0.9375rem;
+  transition: all 0.2s ease;
+}
+
+.input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+  outline: none;
+}
+
+.error-message {
+  background-color: #fef2f2;
+  color: #dc2626;
+  padding: 0.75rem 1rem;
+  border-radius: 0.375rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
 .submit-btn {
   width: 100%;
   padding: 0.75rem 1.5rem;

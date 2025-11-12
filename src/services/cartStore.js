@@ -1,4 +1,3 @@
-// src/services/cartStore.js
 import { defineStore } from 'pinia'
 
 export const useCartStore = defineStore('cart', {
@@ -11,7 +10,6 @@ export const useCartStore = defineStore('cart', {
   
   actions: {
     addItem(item) {
-      // Si el carrito está vacío o es del mismo restaurante
       if (this.restaurantId === null || this.restaurantId === item.restaurantId) {
         const existingItem = this.items.find(i => i.id === item.id)
         if (existingItem) {
@@ -22,7 +20,6 @@ export const useCartStore = defineStore('cart', {
         this.restaurantId = item.restaurantId
         this.restaurantName = item.restaurantName
       } else {
-        // Preguntar si quiere vaciar el carrito
         if (confirm(`¿Deseas vaciar el carrito y agregar productos de ${item.restaurantName}?`)) {
           this.items = [{ ...item, quantity: 1 }]
           this.restaurantId = item.restaurantId

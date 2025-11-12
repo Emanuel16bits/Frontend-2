@@ -2,68 +2,65 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
 
-// Configurar la URL base de tu API
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
-// Configurar axios
 axios.defaults.baseURL = API_URL
 axios.defaults.headers.common['Content-Type'] = 'application/json'
 
 export const useAuthStore = defineStore('auth', () => {
-  // State
+
   const token = ref(localStorage.getItem('token') || null)
   const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
   const restaurant = ref(JSON.parse(localStorage.getItem('restaurant') || 'null'))
-
-  // Getters
   const isAuthenticated = computed(() => !!token.value)
   const userType = computed(() => user.value?.rol || null)
   const userName = computed(() => user.value?.nombre || '')
   const userId = computed(() => user.value?.id || null)
 
-  // Actions
   
-  /**
-   * Registrar un nuevo usuario (con o sin restaurante)
-   */
-  async function register(userData) {
-    try {
-      console.log('📤 Enviando datos de registro:', userData)
-      
-      const response = await axios.post('/users', userData)
-      
-      console.log('📥 Respuesta del servidor:', response.data)
-      
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Error al registrar')
-      }
-
-      return response.data
-    } catch (error) {
-      console.error('❌ Error en register:', error)
-      
-      if (error.response) {
-        // El servidor respondió con un código de error
-        throw new Error(error.response.data?.message || 'Error del servidor')
-      } else if (error.request) {
-        // La petición fue hecha pero no hubo respuesta
-        throw new Error('No se pudo conectar con el servidor')
-      } else {
-        // Algo pasó al configurar la petición
-        throw error
+  
+ async function register(userData) {
+  try {
+    console.log('Enviando datos de registro:', userData)
+    
+    const response = await axios.post('/users', userData)
+    console.log('Respuesta del servidor:', response.data)
+    
+    if (response.data) {
+      return {
+        success: true,
+        data: response.data
       }
     }
+    
+    throw new Error('No se recibieron datos del servidor')
+  } catch (error) {
+    console.error('Error en register:', error)
+    
+    let errorMessage = 'Error al registrar'
+    
+    if (error.response) {
+      if (error.response.data?.error?.includes('Duplicate entry') && 
+          error.response.data?.error?.includes('email')) {
+        errorMessage = 'Este correo electronico ya está registrado'
+      } 
+      else {
+        errorMessage = error.response.data?.message || 
+                      error.response.data?.error || 
+                      'Error del servidor'
+      }
+    } else if (error.request) {
+      errorMessage = 'No se pudo conectar con el servidor'
+    }
+    
+    throw new Error(errorMessage)
   }
+}
 
-  /**
-   * Iniciar sesión
-   */
   async function login(credentials) {
     try {
-      console.log('📤 Intentando login con:', credentials.email)
+      console.log('Intentando login con:', credentials.email)
       
-      // TODO: Reemplazar con tu endpoint real de login
-      // Por ahora busca el usuario por email
       const response = await axios.get('/users')
       
       if (!response.data.success) {
@@ -76,90 +73,78 @@ export const useAuthStore = defineStore('auth', () => {
       )
 
       if (!foundUser) {
-        throw new Error('Credenciales inválidas')
+        throw new Error('Credenciales invalidas')
       }
 
-      // Generar un token simulado
       const authToken = 'token-' + Date.now()
 
-      // Guardar usuario y token
       token.value = authToken
       user.value = foundUser
       localStorage.setItem('token', authToken)
       localStorage.setItem('user', JSON.stringify(foundUser))
 
-      console.log('✅ Login exitoso:', foundUser)
+      console.log('Login exitoso:', foundUser)
 
-      // Si es vendedor, cargar su restaurante
       if (foundUser.rol === 'vendedor') {
         await loadUserRestaurant(foundUser.id)
       }
 
       return foundUser
     } catch (error) {
-      console.error('❌ Error en login:', error)
+      console.error('Error en login:', error)
       throw error
     }
   }
 
-  /**
-   * Cargar restaurante del usuario
-   */
-  async function loadUserRestaurant(userId) {
+async function loadUserRestaurant(userId) {
     try {
-      console.log('🏪 Cargando restaurante del usuario ID:', userId)
+      console.log('Cargando restaurante del usuario id:', userId)
       
       const response = await axios.get(`/users/${userId}/restaurant`)
       
-      console.log('📥 Respuesta del restaurante:', response.data)
+      console.log('Respuesta del restaurante:', response.data)
       
       if (response.data.success && response.data.data) {
         restaurant.value = response.data.data
         localStorage.setItem('restaurant', JSON.stringify(response.data.data))
-        console.log('✅ Restaurante cargado:', restaurant.value)
+        console.log('Restaurante cargado:', restaurant.value)
         return restaurant.value
       } else {
-        console.log('ℹ️ Usuario sin restaurante asociado')
+        console.log('Usuario sin restaurante asociado')
         restaurant.value = null
         localStorage.removeItem('restaurant')
         return null
       }
     } catch (error) {
-      console.error('❌ Error al cargar restaurante:', error)
+      console.error('Error al cargar restaurante:', error)
       restaurant.value = null
       localStorage.removeItem('restaurant')
       return null
     }
   }
 
-  /**
-   * Actualizar información del restaurante
-   */
-  async function updateRestaurant(restaurantId, updates) {
+async function updateRestaurant(restaurantId, updates) {
     try {
-      console.log('🔄 Actualizando restaurante:', restaurantId, updates)
+      console.log('Actualizando restaurante', restaurantId, updates)
       
       const response = await axios.patch(`/restaurants/${restaurantId}`, updates)
       
       if (response.data.success) {
         restaurant.value = response.data.data
         localStorage.setItem('restaurant', JSON.stringify(response.data.data))
-        console.log('✅ Restaurante actualizado:', restaurant.value)
+        console.log('Restaurante actualizado:', restaurant.value)
         return restaurant.value
       }
       
       throw new Error(response.data.message || 'Error al actualizar')
     } catch (error) {
-      console.error('❌ Error al actualizar restaurante:', error)
+      console.error('Error al actualizar restaurante', error)
       throw error
     }
   }
 
-  /**
-   * Cerrar sesión
-   */
-  function logout() {
-    console.log('👋 Cerrando sesión...')
+function logout() {
+    console.log('Cerrando sesión...')
     token.value = null
     user.value = null
     restaurant.value = null
@@ -168,10 +153,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('restaurant')
   }
 
-  /**
-   * Verificar autenticación al cargar la app
-   */
-  function checkAuth() {
+function checkAuth() {
     const storedToken = localStorage.getItem('token')
     const storedUser = localStorage.getItem('user')
     const storedRestaurant = localStorage.getItem('restaurant')
@@ -184,18 +166,15 @@ export const useAuthStore = defineStore('auth', () => {
         restaurant.value = JSON.parse(storedRestaurant)
       }
       
-      console.log('✅ Sesión restaurada:', user.value)
+      console.log('Sesión restaurada:', user.value)
       return true
     }
     
-    console.log('ℹ️ No hay sesión activa')
+    console.log('No hay sesión activa')
     return false
   }
 
-  /**
-   * Recargar datos del usuario actual
-   */
-  async function refreshUser() {
+async function refreshUser() {
     if (!userId.value) return null
 
     try {
@@ -212,22 +191,19 @@ export const useAuthStore = defineStore('auth', () => {
         return user.value
       }
     } catch (error) {
-      console.error('❌ Error al refrescar usuario:', error)
+      console.error('Error al refrescar usuario:', error)
       return null
     }
   }
 
   return {
-    // State
     token,
     user,
     restaurant,
-    // Getters
     isAuthenticated,
     userType,
     userName,
     userId,
-    // Actions
     register,
     login,
     logout,

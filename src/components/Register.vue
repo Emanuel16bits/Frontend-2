@@ -6,7 +6,7 @@
       <div class="form-section">
         <h3>Datos de Usuario</h3>
         <div class="form-group">
-          <label for="nombre">Nombre Completo*</label>
+          <label for="nombre">Nombre*</label>
           <input 
             type="text" 
             id="nombre" 
@@ -17,7 +17,7 @@
         </div>
 
         <div class="form-group">
-          <label for="email">Correo Electrónico*</label>
+          <label for="email">Correo Electronico*</label>
           <input 
             type="email" 
             id="email" 
@@ -64,7 +64,7 @@
         </div>
 
         <div class="form-group">
-          <label for="descripcion">Descripción</label>
+          <label for="descripcion">Descripcion</label>
           <textarea 
             id="descripcion" 
             v-model="newUser.restaurante.descripcion"
@@ -74,18 +74,18 @@
         </div>
 
         <div class="form-group">
-          <label for="direccion">Dirección*</label>
+          <label for="direccion">Direccion*</label>
           <input 
             type="text" 
             id="direccion" 
             v-model="newUser.restaurante.direccion"
             :required="newUser.rol === 'vendedor'"
-            placeholder="Dirección del restaurante"
+            placeholder="Direccion del restaurante"
           >
         </div>
 
         <div class="form-group">
-          <label for="categoria">Categoría*</label>
+          <label for="categoria">Categoria*</label>
           <select 
             id="categoria" 
             v-model="newUser.restaurante.categoria"
@@ -101,7 +101,7 @@
 
         <div class="form-row">
           <div class="form-group">
-            <label for="horarioApertura">Hora de Apertura*</label>
+            <label for="horarioApertura">Hora de Apertura</label>
             <input 
               type="time" 
               id="horarioApertura" 
@@ -111,7 +111,7 @@
           </div>
 
           <div class="form-group">
-            <label for="horarioCierre">Hora de Cierre*</label>
+            <label for="horarioCierre">Hora de Cierre</label>
             <input 
               type="time" 
               id="horarioCierre" 
@@ -168,21 +168,21 @@ const error = ref(false)
 const handleCreate = async () => {
   try {
     loading.value = true
-    message.value = ''
+    message.value = 'Registrando...'
     error.value = false
 
     const response = await authStore.register(newUser.value)
     
-    if (response.success) {
-      message.value = '¡Registro exitoso! Redirigiendo...'
+    if (response && response.success) {
+      message.value = 'Registro exitoso'
       error.value = false
       setTimeout(() => {
         router.push('/login')
       }, 1500)
     }
   } catch (err) {
-    console.error('Error en el registro:', err)
-    message.value = err.message || 'Error al registrar. Por favor, inténtalo de nuevo.'
+    console.error('Error en el registro', err)
+    message.value = err.message
     error.value = true
   } finally {
     loading.value = false

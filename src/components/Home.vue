@@ -9,25 +9,25 @@
 
     <main class="home-main">
       <h2>Selecciona tu rol</h2>
-      <p class="subtitle">Elegí cómo querés ingresar a comidApp</p>
+      <p class="subtitle">Elegi cómo querés ingresar a comidApp</p>
 
       <div class="home-options">
         <div class="option-card" @click="selectRole('cliente')">
           <i class="fa-solid fa-basket-shopping"></i>
           <h3>Cliente</h3>
-          <p>Compra productos y realiza pedidos fácilmente.</p>
+          <p>Compra productos y realiza pedidos facilmente.</p>
         </div>
 
         <div class="option-card" @click="selectRole('vendedor')">
           <i class="fa-solid fa-store"></i>
           <h3>Vendedor</h3>
-          <p>Gestioná tus productos y controlá tus ventas.</p>
+          <p>Gestionar tus productos y ver tus ventas.</p>
         </div>
 
         <div class="option-card" @click="selectRole('repartidor')">
           <i class="fa-solid fa-motorcycle"></i>
           <h3>Delivery</h3>
-          <p>Entregá pedidos y revisá tu historial de entregas.</p>
+          <p>Entregar pedidos y revisar tu historial de entregas.</p>
         </div>
       </div>
     </main>
@@ -188,9 +188,8 @@ h2 {
   margin: 0;
 }
 
-/* Footer */
 .home-footer {
-  background-color: #667eea; /* Mismo color que el header */
+  background-color: #667eea;
   color: white;
   text-align: center;
   padding: 1.5rem;
@@ -199,7 +198,6 @@ h2 {
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .home-header {
     padding: 1rem;

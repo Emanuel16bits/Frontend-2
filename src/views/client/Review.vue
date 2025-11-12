@@ -1,7 +1,7 @@
 <template>
   <div class="rating-view">
     <header class="page-header">
-      <h1>📝 Calificar Pedido</h1>
+      <h1>Calificar Pedido</h1>
       <button class="btn btn-back" @click="goBack">
         ← Volver a mis pedidos
       </button>
@@ -102,11 +102,9 @@ const fetchOrderDetails = async () => {
     loading.value = true;
     error.value = null;
     
-    // Obtenemos los detalles del pedido desde la API
     const orderData = await getOrderById(orderId);
-    console.log('Datos del pedido:', orderData); // Para depuración
+    console.log('Datos del pedido:', orderData); 
     
-    // Mapeamos los datos a la estructura esperada
     order.value = {
       id: orderData.id,
       clienteNombre: orderData.usuario?.nombre || 'Cliente',
@@ -118,8 +116,8 @@ const fetchOrderDetails = async () => {
     
     loading.value = false;
   } catch (err) {
-    console.error('Error al cargar el pedido:', err);
-    error.value = 'No se pudo cargar la información del pedido. Por favor, inténtalo de nuevo.';
+    console.error('Error al cargar el pedido', err);
+    error.value = 'No se pudo cargar la información del pedido';
     loading.value = false;
   }
 };
@@ -140,19 +138,16 @@ const submitRating = async () => {
   try {
     isSubmitting.value = true;
     
-    // Enviamos la calificación al servidor
     await rateOrder(orderId, rating.value, comment.value);
     
-    // Redirigimos a la página de pedidos con un mensaje de éxito
     router.push({
       path: '/pedidos',
       query: { rated: 'true' }
     });
   } catch (err) {
-    console.error('Error al enviar la calificación:', err);
-    let errorMessage = 'Ocurrió un error al enviar tu calificación. Por favor, inténtalo de nuevo.';
+    console.error('Error al enviar la calificación', err);
+    let errorMessage = 'Ocurrió un error al enviar tu calificación';
     
-    // Manejo de errores específicos
     if (err.response) {
       if (err.response.status === 400) {
         errorMessage = 'La calificación debe estar entre 1 y 5 estrellas.';
@@ -173,15 +168,12 @@ const submitRating = async () => {
 const goBack = () => {
   router.go(-1);
 };
-
-// Cargar los detalles del pedido al montar el componente
 onMounted(() => {
   fetchOrderDetails();
 });
 </script>
 
 <style scoped>
-/* Estilos anteriores... */
 .rating-view {
   min-height: 100vh;
   background-color: #f5f5f5;
@@ -407,7 +399,6 @@ onMounted(() => {
   background-color: #5a6268;
 }
 
-/* Ajustes para móviles */
 @media (max-width: 768px) {
   .rating-view {
     padding: 1rem;

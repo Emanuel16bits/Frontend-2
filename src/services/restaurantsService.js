@@ -1,36 +1,78 @@
-import axios from 'axios'
+import axios from 'axios';
 
-const API_URL = 'http://localhost:3000/api' // Ajusta según tu configuración
+const API_URL = 'http://localhost:3000';
 
-export default {
-  async getAll() {
+export const getRestaurants = async () => {
+  try {
     const response = await axios.get(`${API_URL}/restaurants`)
     return response.data
-  },
+  } catch (error) {
+    console.error('Error al obtener restaurantes', error)
+    throw error
+  }
+};
 
-  async getById(id) {
+export const getRestaurantById = async (id) => {
+  try {
     const response = await axios.get(`${API_URL}/restaurants/${id}`)
     return response.data
-  },
+  } catch (error) {
+    console.error(`Error al obtener el restaurante ${id}`, error)
+    throw error
+  }
+};
 
-  async create(restaurantData) {
+export const getRestaurantsByUser = async (userId) => {
+  try {
+    const response = await axios.get(`${API_URL}/restaurants/usuario/${userId}`)
+    return response.data
+  } catch (error) {
+    console.error(`Error al obtener restaurantes del usuario ${userId}`, error)
+    if (error.response && error.response.status === 404) {
+      return []
+    }
+    throw error
+  }
+};
+
+export const createRestaurant = async (restaurantData) => {
+  try {
     const response = await axios.post(`${API_URL}/restaurants`, restaurantData)
     return response.data
-  },
+  } catch (error) {
+    console.error('Error al crear restaurante', error)
+    throw error
+  }
+};
 
-  async update(id, restaurantData) {
-    const response = await axios.put(`${API_URL}/restaurants/${id}`, restaurantData)
+export const updateRestaurant = async (id, restaurantData) => {
+  try {
+    const response = await axios.patch(`${API_URL}/restaurants/${id}`, restaurantData)
     return response.data
-  },
+  } catch (error) {
+    console.error(`Error al actualizar el restaurante ${id}`, error)
+    throw error
+  }
+};
 
-  async delete(id) {
-    await axios.delete(`${API_URL}/restaurants/${id}`)
-  },
+export const deleteRestaurant = async (id) => {
+  try {
+    const response = await axios.delete(`${API_URL}/restaurants/${id}`)
+    return response.data
+  } catch (error) {
+    console.error(`Error al eliminar el restaurante ${id}`, error)
+    throw error
+  }
+};
 
-  async search(query) {
+export const searchRestaurants = async (query) => {
+  try {
     const response = await axios.get(`${API_URL}/restaurants/search`, {
       params: { q: query },
-    })
+    });
     return response.data
-  },
-}
+  } catch (error) {
+    console.error('Error al buscar restaurantes', error)
+    throw error
+  }
+};

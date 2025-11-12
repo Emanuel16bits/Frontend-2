@@ -1,16 +1,14 @@
 <template>
   <div class="cart-page">
-    <!-- Header -->
     <header class="header">
       <div class="container">
         <button @click="goBack" class="btn-back">← Volver</button>
-        <h1>🛒 Mi Carrito</h1>
+        <h1>Mi Carrito</h1>
         <div></div>
       </div>
     </header>
 
     <div class="container">
-      <!-- Empty Cart -->
       <div v-if="!cartStore.items.length" class="empty-cart">
         <div class="empty-icon">🛒</div>
         <h2>Tu carrito está vacío</h2>
@@ -20,20 +18,16 @@
         </button>
       </div>
 
-      <!-- Cart with Items -->
       <div v-else class="cart-content">
         <div class="cart-main">
-          <!-- Restaurant Info -->
           <div class="restaurant-card" v-if="cartStore.restaurantName">
             <div class="restaurant-header">
               <h3>{{ cartStore.restaurantName }}</h3>
               <button @click="handleClearCart" class="btn-clear-cart">
-                🗑️ Vaciar carrito
+               Vaciar carrito
               </button>
             </div>
           </div>
-
-          <!-- Cart Items -->
           <div class="cart-items">
             <h3>Productos ({{ cartStore.totalItems }})</h3>
             
@@ -83,15 +77,14 @@
                   class="btn-remove"
                   title="Eliminar"
                 >
-                  🗑️
+                  Eliminar
                 </button>
               </div>
             </div>
           </div>
 
-          <!-- Add Notes Section -->
           <div class="add-notes-section">
-            <h3>📝 Notas para el restaurante</h3>
+            <h3>Notas para el restaurante</h3>
             <div class="notes-container">
               <textarea
                 v-model="notasPedido"
@@ -104,7 +97,6 @@
           </div>
         </div>
 
-        <!-- Order Summary -->
         <div class="order-summary">
           <div class="summary-card">
             <h3>Resumen del pedido</h3>
@@ -150,7 +142,6 @@ const authStore = useAuthStore()
 const notasPedido = ref('')
 const imageLoadError = ref({})
 
-// Métodos
 const goBack = () => {
   router.go(-1)
 }
@@ -169,7 +160,7 @@ const removeItem = (itemId) => {
 }
 
 const handleClearCart = () => {
-  if (confirm('¿Estás seguro de vaciar el carrito?')) {
+  if (confirm('¿Queres vaciar el carrito?')) {
     cartStore.clearCart()
   }
 }
@@ -186,9 +177,7 @@ const getImageUrl = (imagePath) => {
 
 const confirmarPedido = async () => {
   try {
-    const userId = authStore.user.id; // Reemplaza con el ID del usuario real
-
-    // 1. Crear la orden vacía
+    const userId = authStore.user.id;
     const ordenResponse = await axios.post('http://localhost:3000/orders', {
       precioTotal: cartStore.totalPrice,
       idUsuario: userId
@@ -197,8 +186,6 @@ const confirmarPedido = async () => {
     });
 
     const ordenId = ordenResponse.data.id;
-
-    // 2. Agregar los items a la orden
     for (const item of cartStore.items) {
       await axios.post('http://localhost:3000/order-items', {
         idOrden: ordenId,
@@ -208,17 +195,15 @@ const confirmarPedido = async () => {
         withCredentials: true
       });
     }
-
-    // 3. Limpiar el carrito y redirigir
     cartStore.clearCart();
     router.push('/mis-pedidos');
-    alert('¡Pedido realizado con éxito!');
+    alert('Pedido realizado con exito');
   } catch (error) {
-    console.error('Error al confirmar el pedido:', error);
+    console.error('Error al confirmar el pedido', error);
     if (error.response) {
-      console.error('Detalles del error:', error.response.data);
+      console.error('Detalles del error', error.response.data);
     }
-    alert('Ocurrió un error al procesar tu pedido. Por favor, inténtalo de nuevo.');
+    alert('Ocurrió un error al procesar tu pedido');
   }
 };
 </script>
@@ -231,7 +216,6 @@ const confirmarPedido = async () => {
   min-height: 70vh;
 }
 
-/* Header */
 .header {
   background: white;
   padding: 15px 0;
@@ -265,7 +249,6 @@ const confirmarPedido = async () => {
   color: #333;
 }
 
-/* Estilos del carrito */
 .container {
   display: flex;
   gap: 30px;
@@ -284,7 +267,6 @@ const confirmarPedido = async () => {
   flex: 2;
 }
 
-/* Tarjeta del restaurante */
 .restaurant-card {
   background: white;
   border-radius: 12px;
@@ -312,7 +294,6 @@ const confirmarPedido = async () => {
   gap: 5px;
 }
 
-/* Items del carrito */
 .cart-items {
   margin-bottom: 30px;
 }
@@ -437,7 +418,6 @@ const confirmarPedido = async () => {
   transform: translateY(-1px);
 }
 
-/* Sección de notas */
 .add-notes-section {
   margin-top: 30px;
   background: #f8f9fa;
@@ -484,7 +464,6 @@ const confirmarPedido = async () => {
   margin-top: 5px;
 }
 
-/* Resumen del pedido */
 .order-summary {
   flex: 1;
   position: sticky;
@@ -550,7 +529,6 @@ const confirmarPedido = async () => {
   cursor: not-allowed;
 }
 
-/* Carrito vacío */
 .empty-cart {
   text-align: center;
   padding: 50px 20px;
@@ -591,7 +569,6 @@ const confirmarPedido = async () => {
   background: #43A047;
 }
 
-/* Responsive */
 @media (max-width: 992px) {
   .container {
     flex-direction: column;

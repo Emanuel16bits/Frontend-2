@@ -3,8 +3,8 @@ import { getDriver, updateAvailability } from '@/services/driverService'
 
 export const useDriverStore = defineStore('driverStore', {
   state: () => ({
-    driverId: null,  // id del driver logueado
-    driver: null,    // datos del driver
+    driverId: null,  
+    driver: null,    
     loading: false,
     error: null
   }),
